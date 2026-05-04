@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dating Event — Auction Items</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>Dating Event — Auction Items</div>
+    </div>
+    <div class="nav-actions">
+      <a class="btn" href="index.html">🏠 返回遊戲</a>
+      <a class="btn primary" href="items.html">🧾 拍賣品</a>
+      <a class="btn" href="rules.html">📜 遊戲規則</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="card-b">
+        <h1 style="margin:0 0 10px 0;">拍賣品</h1>
+
+        <div class="list" id="itemsList"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "datingAuctionGame_pinkYellow_v1";
+
+  const items = [
+    { id:1, icon:"👨‍👩‍👧‍👦", name:"家庭",  desc:"健康成長家庭中有愛錫自己的父母，家人關係和睦" },
+    { id:2, icon:"🩺",       name:"健康",  desc:"身體健康，沒有大病痛，不用手術，平安壽終正寢" },
+    { id:3, icon:"💄",       name:"外貌",  desc:"稱得上漂亮/英俊的身型及外表" },
+    { id:4, icon:"💼",       name:"事業",     desc:"能夠發揮自己專長又感興趣的工作，並有長遠的職涯發展" },
+    { id:5, icon:"🧑‍🤝‍🧑",  name:"友情", desc:"理解自己、無所不談又能夠陪伴一生的好友" },
+    { id:6, icon:"💰",       name:"財富",   desc:"不是家財億萬，但終生不用為金錢擔憂" },
+    { id:7, icon:"❤️",       name:"愛情",    desc:"一位神及眾人所祝福，彼此身心靈契合的伴侶" },
+    { id:8, icon:"⛪",       name:"信仰",  desc:"美好教會團契生活，有牧養，有清晰使命。在人生不確定中仍然堅定的信心，能夠終身回應上主的召命" }
+  ];
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch{
+      return null;
+    }
+  }
+
+  const state = loadState();
+  const teams = state?.teams || [];
+  const rounds = state?.rounds || [];
+
+  function winnerForItem(roundId){
+    const r = rounds[roundId - 1];
+    if(!r || !r.done) return null;
+    const t = teams[r.winnerTeamId];
+    return t ? t.name : null;
+  }
+
+  const list = document.getElementById("itemsList");
+  list.innerHTML = items.map(it => {
+    const winnerName = winnerForItem(it.id);
+    const tag = winnerName ? `Won by: ${winnerName}` : "Not won yet";
+    return `
+      <div class="item">
+        <div class="left">
+          <div class="icon">${it.icon}</div>
+          <div>
+            <div class="name">拍賣品 ${it.id}: ${it.name}</div>
+            <div class="desc">${it.desc}</div>
+          </div>
+        </div>
+        <div class="tag">${tag}</div>
+      </div>
+    `;
+  }).join("");
+})();
+</script>
+</body>
+</html>
