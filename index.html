@@ -74,16 +74,17 @@
               <span class="pill" id="bidHintPill">Enter bids</span>
             </div>
             <div class="card-b">
-              <div class="bids" id="bidInputs"></div>
-              <div class="hint" id="bidHint">Start a round to enable bid inputs.</div>
+              <div class="bidBBox" id="bidBox">
+                <div class="bids" id="bidInputs"></div>
+                <div class="hint" id="bidHint">Start a round to enable bid inputs.</div>
 
-              <div class="err" id="errorBox"></div>
+                <div class="err" id="errorBox"></div>
 
-              <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-                <button class="btn primary" id="battleBtn" disabled>Round Battle</button>
-                <button class="btn" id="clearBidsBtn" disabled>Clear Inputs</button>
+                <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn primary" id="battleBtn" disabled>Round Battle</button>
+                  <button class="btn" id="clearBidsBtn" disabled>Clear Inputs</button>
+                </div>
               </div>
-
               <!-- Battle results -->
               <div class="battleBox" id="battleBox">
                 <div style="font-weight:1000;">Top 2 Prices (includes ties)</div>

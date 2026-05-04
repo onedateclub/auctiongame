@@ -64,6 +64,7 @@
   const elErrorBox = document.getElementById("errorBox");
   const elBattleBtn = document.getElementById("battleBtn");
   const elClearBidsBtn = document.getElementById("clearBidsBtn");
+  const elBidBox = document.getElementById("bidBox");
   const elBattleBox = document.getElementById("battleBox");
   const elTopGrid = document.getElementById("topGrid");
   const elWinnerPick = document.getElementById("winnerPick");
@@ -233,6 +234,7 @@
   }
 
   function resetBattleUI(){
+    elBidBox.style.display = "block";
     elBattleBox.style.display = "none";
     elTopGrid.innerHTML = "";
     elWinnerPick.innerHTML = "";
@@ -417,6 +419,7 @@
     saveState();
 
     elBattleBox.style.display = "block";
+    elBidBox.style.display = "none";
     elConfirmWinnerBtn.disabled = true;
     renderCandidatesAndWinnerPick(info);
   });
