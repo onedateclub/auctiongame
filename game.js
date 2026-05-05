@@ -159,9 +159,13 @@
       btn.setAttribute("aria-disabled", disabled ? "true" : "false");
       btn.classList.toggle("done", r.done);
       btn.classList.toggle("active", state.currentRound === r.id);
+	  
+      // Get icon from constant
+	  const miniitem = items[r.id-1];
+	  const icon = miniitem?.icon ?? ""; 
 
       btn.innerHTML = `
-        <div class="t">${r.id}</div>
+	    <div class="icon">${icon}</div>
         <div class="s">${r.done ? "Completed" : (lockedByProgress ? "Locked" : (r.started ? "Resume" : "Ready"))}</div>
       `;
 
@@ -388,7 +392,7 @@
     const candText = candidates.map(c => `${c.name} 出價 (${c.bid}) 鑽石`).join(" • ");
 
     const html = `
-      <div style="font-weight:1000;">Round ${roundId}: ${item.icon} ${item.desc}</div>
+      <div style="font-weight:1000;">Item ${roundId}: ${item.icon} ${item.desc}</div>
       <div class="muted">出線隊伍: ${candText}</div>
       <div style="margin-top:6px;">
         中標者: <b>${winner.name}</b> 支付 <b>${winningBid}</b> 鑽石。
