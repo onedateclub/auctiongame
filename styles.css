@@ -49,11 +49,13 @@ body{
   letter-spacing:.2px;
 }
 .logo{
-  width:34px; height:34px; border-radius:12px;
-  background: linear-gradient(135deg, var(--pink), var(--sunglow));
-  box-shadow: 0 10px 22px rgba(255,125,176,.22);
-  position:relative;
-  overflow:hidden;
+  width: 48px;          
+  height: 48px;
+  background-image: url("maps/logo.jpeg"); 
+  background-size: cover;     /* or contain */
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 8px;
 }
 .logo::after{
   content:"";
