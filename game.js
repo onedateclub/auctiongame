@@ -89,7 +89,7 @@
 
   function updatePills(){
     const done = completedCount();
-    elProgressPill.textContent = `${done} / ${ROUND_COUNT} completed`;
+    elProgressPill.textContent = `${done} / ${ROUND_COUNT} 成交`;
 
     if(done === 0) elStatusPill.textContent = "未成交";
     else if(done < ROUND_COUNT) elStatusPill.textContent = `成交 (${done}/${ROUND_COUNT})`;
@@ -166,7 +166,7 @@
 
       btn.innerHTML = `
 	    <div class="icon">${icon}</div>
-        <div class="s">${r.done ? "Completed" : (lockedByProgress ? "Locked" : (r.started ? "Resume" : "Ready"))}</div>
+        <div class="s">${r.done ? "成交" : (lockedByProgress ? "未拍賣" : (r.started ? "拍賣中" : "即將拍賣"))}</div>
       `;
 
       btn.addEventListener("click", () => {
@@ -230,8 +230,8 @@
       });
     });
 
-    elBidHint.textContent = round.done ? "Round locked (completed)" : "Enter all 5 bids";
-    elBattleBtn.textContent = `Round ${roundId} Battle`;
+    elBidHint.textContent = round.done ? "Round locked (completed)" : "";
+    elBattleBtn.textContent = `確認出價`;
     elBattleBtn.disabled = round.done;
     elClearBidsBtn.disabled = round.done;
     elBidHintPill.textContent = round.done ? "Locked" : "Enter bids";
@@ -342,7 +342,7 @@
       elTopGrid.appendChild(card);
     });
 
-    elWinnerPick.innerHTML = `<div class="muted" style="font-weight:1000;">Select Winner:</div>`;
+    elWinnerPick.innerHTML = `<div class="muted" style="font-weight:1000;">評判選出中標隊伍:</div>`;
     candidates.forEach(c => {
       const label = document.createElement("label");
       label.className = "radioPill";
@@ -459,7 +459,7 @@
     const winningBid = round.bids[winnerTeamId];
 
     if(!Number.isFinite(winningBid)){
-      showError("Winning bid is invalid. Please re-enter bids and battle again.");
+      showError("Winning bid is invalid. Please re-enter bids.");
       return;
     }
 
