@@ -91,16 +91,16 @@
     const done = completedCount();
     elProgressPill.textContent = `${done} / ${ROUND_COUNT} completed`;
 
-    if(done === 0) elStatusPill.textContent = "Not started";
-    else if(done < ROUND_COUNT) elStatusPill.textContent = `In progress (${done}/${ROUND_COUNT})`;
+    if(done === 0) elStatusPill.textContent = "未成交";
+    else if(done < ROUND_COUNT) elStatusPill.textContent = `成交 (${done}/${ROUND_COUNT})`;
     else elStatusPill.textContent = "Game finished";
 
     if(state.currentRound == null){
-      elRoundTitle.textContent = "Round: —";
+      elRoundTitle.textContent = "拍賣品: —";
       elRoundStatePill.textContent = "Idle";
     }else{
       const r = state.rounds[state.currentRound - 1];
-      elRoundTitle.textContent = `Round: ${r.id}`;
+      elRoundTitle.textContent = `拍賣品: ${r.id}`;
       elRoundStatePill.textContent = r.done ? "Locked" : (r.started ? "Started" : "Idle");
     }
   }
@@ -226,7 +226,7 @@
       });
     });
 
-    elBidHint.textContent = round.done ? "Round locked (completed)" : "Enter all 5 bids, then battle";
+    elBidHint.textContent = round.done ? "Round locked (completed)" : "Enter all 5 bids";
     elBattleBtn.textContent = `Round ${roundId} Battle`;
     elBattleBtn.disabled = round.done;
     elClearBidsBtn.disabled = round.done;
@@ -284,7 +284,7 @@
    * - Include all teams whose bid == top1 OR bid == top2
    * - If no second distinct value, include all teams in top1 (could be everyone)
    */
-  function computeTop2WithTies(roundId){
+  function computeTop2WithTies(roundId) {
     const round = state.rounds[roundId - 1];
 
     const bids = state.teams.map(t => ({
@@ -294,16 +294,30 @@
       bid: round.bids[t.id]
     }));
 
-    const distinct = Array.from(new Set(bids.map(b => b.bid))).sort((a,b)=>b-a);
+    // Get distinct bid values sorted descending
+    const distinct = Array.from(new Set(bids.map(b => b.bid))).sort((a, b) => b - a);
     const top1 = distinct[0];
-    const top2 = distinct.length > 1 ? distinct[1] : null;
 
+    // Count how many teams have top1
+    const top1Count = bids.filter(b => b.bid === top1).length;
+
+    // If top1 has 2 or more candidates → DO NOT return top2
+    let top2 = null;
+    if (top1Count === 1 && distinct.length > 1) {
+      top2 = distinct[1];
+    }
+
+    // Filter candidates
     const candidates = bids
-      .filter(b => b.bid === top1 || (top2 != null && b.bid === top2))
-      .sort((a,b)=> b.bid - a.bid || a.name.localeCompare(b.name));
+      .filter(b =>
+        b.bid === top1 ||
+        (top2 != null && b.bid === top2 && b.bid > 0)
+      )
+      .sort((a, b) => b.bid - a.bid || a.name.localeCompare(b.name));
 
     return { candidates, top1, top2 };
   }
+
 
   function renderCandidatesAndWinnerPick(info){
     const { candidates, top1, top2 } = info;
@@ -331,7 +345,6 @@
       label.innerHTML = `
         <input type="radio" name="winner" value="${c.teamId}" />
         <span style="display:flex; gap:8px; align-items:center;">
-          <span class="dot" style="background:${c.color};"></span>
           ${c.name}
         </span>
       `;
@@ -372,14 +385,14 @@
     const item = items[roundId - 1];
     const winner = state.teams[winnerTeamId];
 
-    const candText = candidates.map(c => `${c.name} (${c.bid})`).join(" • ");
+    const candText = candidates.map(c => `${c.name} 出價 (${c.bid}) 鑽石`).join(" • ");
 
     const html = `
       <div style="font-weight:1000;">Round ${roundId}: ${item.icon} ${item.name}</div>
-      <div class="muted">Top candidates: ${candText}</div>
+      <div class="muted">出線隊伍: ${candText}</div>
       <div style="margin-top:6px;">
-        Winner: <b>${winner.name}</b> paid <b>${winningBid}</b> diamonds.
-        Remaining: <b>${winner.diamonds}</b>
+        中標者: <b>${winner.name}</b> 支付 <b>${winningBid}</b> 鑽石。
+        剩餘: <b>${winner.diamonds}</b>
       </div>
     `;
     state.log = state.log || [];
@@ -476,8 +489,8 @@
       renderRoundButtons();
       updatePills();
 
-      elItemName.textContent = "Round completed";
-      elItemDesc.textContent = "Click Start Round " + nextId + " to continue.";
+      elItemName.textContent = "討論時間";
+      elItemDesc.textContent = "Click Item " + nextId + " to continue.";
       elMapWrap.style.display = "none";
       elBidInputs.innerHTML = "";
       elBidHint.textContent = "Start the next round to enable bid inputs.";
@@ -511,8 +524,8 @@
     clearError();
     resetBattleUI();
 
-    elItemName.textContent = "No item selected";
-    elItemDesc.textContent = "Click a “Start Round” button to reveal the auction item and map.";
+    elItemName.textContent = "討論時間";
+    elItemDesc.textContent = "點擊編號以顯示拍賣物";
     elMapWrap.style.display = "none";
     elBidInputs.innerHTML = "";
     elBidHint.textContent = "Start a round to enable bid inputs.";

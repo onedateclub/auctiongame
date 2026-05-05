@@ -28,19 +28,13 @@
     <!-- Main Panel -->
     <div class="card">
       <div class="card-h">
-        <h2>拍賣界面</h2>
-        <span class="pill" id="statusPill">Not started</span>
+        <h2>拍賣品</h2>
+        <span class="pill" id="statusPill">未成交</span>
       </div>
 
       <div class="card-b">
-        <div class="muted" style="margin-bottom:10px;">
-          點擊 <b>Round X</b> → 輸入5隊投標價 → 點擊 <b>Round X Battle</b> → 檢視最高兩個價格 → 辯論 → 資金結算 → 下一回合
-        </div>
-
-        <div class="sep"></div>
 
         <div>
-          <h3 style="margin:0 0 10px 0;">Rounds</h3>
           <div class="rounds" id="roundButtons"></div>
         </div>
 
@@ -50,19 +44,15 @@
           <!-- Auction Item -->
           <div class="card" style="box-shadow:none;">
             <div class="card-h">
-              <h3 id="roundTitle">Round: —</h3>
+              <h3 id="roundTitle">拍賣品: —</h3>
               <span class="pill" id="roundStatePill">Idle</span>
             </div>
             <div class="card-b itemBox">
-              <h4 class="itemTitle" id="itemName">No item selected</h4>
-              <p class="itemDesc" id="itemDesc">Click a “Start Round” button to reveal the auction item and map.</p>
+              <h4 class="itemTitle" id="itemName">討論時間</h4>
+              <p class="itemDesc" id="itemDesc">點擊編號以顯示拍賣物</p>
 
               <div class="mapWrap" id="mapWrap" style="display:none;">
                 <img id="itemMap" alt="Map for the auction item" />
-              </div>
-
-              <div class="footerNote">
-                Tip: bids must be <b>0</b> or more and cannot exceed the team’s remaining diamonds.
               </div>
             </div>
           </div>
@@ -109,8 +99,8 @@
         <!-- Log -->
         <div class="card" style="box-shadow:none;">
           <div class="card-h">
-            <h3>Round Log</h3>
-            <span class="pill" id="progressPill">0 / 8 completed</span>
+            <h3>成交記錄</h3>
+            <span class="pill" id="progressPill">0 / 8 成交</span>
           </div>
           <div class="card-b">
             <div class="log" id="log"></div>
