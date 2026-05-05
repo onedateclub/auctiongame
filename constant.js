@@ -1,12 +1,12 @@
 const STORAGE_KEY = "datingAuctionGame_pinkYellow_v1";
 
 const TEAM_COUNT = 5;
-const TEAM_NAMES = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5"];
+const TEAM_NAMES = ["Team Green", "Team Black", "Team Red", "Team White", "Team Yellow"];
 const START_DIAMONDS = 100;
 const ROUND_COUNT = 8;
 
 // Distinct but on-theme team colors
-const teamColors = ["#FF7DB0", "#FF9BC2", "#FFD43B", "#FFEA8A", "#FFA876"];
+const teamColors = ["#1acf58", "#000000", "#FF7DB0", "#FFFFFF", "#FFD43B"];
   
 // 8 Dating-event auction items (each with icon)  
 const items = [
