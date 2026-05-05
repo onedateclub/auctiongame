@@ -176,8 +176,8 @@
 
   function renderItem(roundId){
     const item = items[roundId - 1];
-    elItemName.textContent = `${item.icon} ${item.name}`;
-    elItemDesc.textContent = item.desc;
+    elItemName.textContent = `${item.icon} ${item.desc}`;
+    elItemDesc.textContent = '';
 	elItemMap.src = item.mapUrl;
 	elMapWrap.style.display = "block";
 
@@ -388,7 +388,7 @@
     const candText = candidates.map(c => `${c.name} 出價 (${c.bid}) 鑽石`).join(" • ");
 
     const html = `
-      <div style="font-weight:1000;">Round ${roundId}: ${item.icon} ${item.name}</div>
+      <div style="font-weight:1000;">Round ${roundId}: ${item.icon} ${item.desc}</div>
       <div class="muted">出線隊伍: ${candText}</div>
       <div style="margin-top:6px;">
         中標者: <b>${winner.name}</b> 支付 <b>${winningBid}</b> 鑽石。
