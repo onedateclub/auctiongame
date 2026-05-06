@@ -288,6 +288,10 @@ body{
   background: rgba(255,212,59,.14);
   border-color: rgba(255,212,59,.35);
 }
+.roundBtn.skipped{
+  background: rgba(128,128,128,.14);
+  border-color: rgba(255,212,59,.25);
+}
 
 /* Main game area */
 .grid2{

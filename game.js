@@ -16,7 +16,8 @@
         bids: Array(TEAM_COUNT).fill(null),
         topCandidates: null, // candidates (top 2 prices incl ties)
         winnerTeamId: null,
-        winningBid: null
+        winningBid: null,
+        winnerName: null
       })),
       log: []
     };
@@ -271,17 +272,22 @@
       const lockedByProgress = r.id > (completedCount() + 1);
       const disabled = r.done || lockedByProgress;
 
+      const isSkipped = r.done && r.winnerTeamId == null && r.winnerName === "N/A";
       btn.setAttribute("aria-disabled", disabled ? "true" : "false");
-      btn.classList.toggle("done", r.done);
+      btn.classList.toggle("done", r.done && !isSkipped);
+      btn.classList.toggle("skipped", isSkipped);
       btn.classList.toggle("active", state.currentRound === r.id);
-	  
+      
       // Get icon from constant
-	  const miniitem = items[r.id-1];
-	  const icon = miniitem?.icon ?? ""; 
+	    const miniitem = items[r.id-1];
+	    const icon = miniitem?.icon ?? ""; 
 
+      const roundStatus = isSkipped
+        ? "流標"
+        : (r.done ? "成交" : (lockedByProgress ? "未拍賣" : (r.started ? "本輪拍賣" : "即將拍賣")));
       btn.innerHTML = `
 	    <div class="icon">${icon}</div>
-        <div class="s">${r.done ? "成交" : (lockedByProgress ? "未拍賣" : (r.started ? "拍賣中" : "即將拍賣"))}</div>
+        <div class="s">${roundStatus}</div>
       `;
 
       btn.addEventListener("click", () => {
@@ -297,8 +303,8 @@
     const item = items[roundId - 1];
     elItemName.textContent = `${item.icon} ${item.desc}`;
     elItemDesc.textContent = '';
-	elItemMap.src = item.mapUrl;
-	elMapWrap.style.display = "block";
+	  elItemMap.src = item.mapUrl;
+	  elMapWrap.style.display = "block";
 
   }
 
@@ -520,12 +526,43 @@
     renderLog();
   }
 
+  function addNoWinnerLog(roundId){
+    const item = items[roundId - 1];
+    const html = `
+      <div style="font-weight:1000;">Item ${roundId}: ${item.icon} ${item.desc}</div>
+      <div class="muted">本輪流標</div>
+    `;
+    state.log = state.log || [];
+    state.log.push(html);
+    saveState();
+    renderLog();
+  }
+
   function showFinalLeaderboard(){
 
     elEndNote.style.display = "block";
     elEndNote.innerHTML = `
       <div style="font-weight:1000; margin-bottom:6px;">🏁 Finish</div>
     `;
+  }
+
+  function promptNextRound(){
+    const nextId = completedCount() + 1;
+    if(nextId <= ROUND_COUNT){
+      state.currentRound = null;
+      saveState();
+      renderRoundButtons();
+      updatePills();
+
+      elItemName.textContent = "討論時間";
+      elItemDesc.textContent = "Click Item " + nextId + " to continue.";
+      elMapWrap.style.display = "none";
+      elBidInputs.innerHTML = "";
+      elBidHint.textContent = "Start the next round to enable bid inputs.";
+      elBattleBtn.disabled = true;
+      elClearBidsBtn.disabled = true;
+      resetBattleUI();
+    }
   }
 
   // Actions
@@ -543,6 +580,19 @@
     const v = validateAllBids(roundId);
     if(!v.ok){
       showError(v.msg);
+      return;
+    }
+
+    const allZero = round.bids.every(bid => bid === 0);
+    if(allZero){
+      round.winnerTeamId = null;
+      round.winnerName = "N/A";
+      round.winningBid = 0;
+      round.topCandidates = null;
+
+      lockRound(roundId);
+      addNoWinnerLog(roundId);
+      promptNextRound();
       return;
     }
 
@@ -599,24 +649,7 @@
     const candidates = round.topCandidates?.candidates || [];
     addLog(roundId, winnerTeamId, winningBid, candidates);
     lockRound(roundId);
-
-    // Prompt next round
-    const nextId = completedCount() + 1;
-    if(nextId <= ROUND_COUNT){
-      state.currentRound = null;
-      saveState();
-      renderRoundButtons();
-      updatePills();
-
-      elItemName.textContent = "討論時間";
-      elItemDesc.textContent = "Click Item " + nextId + " to continue.";
-      elMapWrap.style.display = "none";
-      elBidInputs.innerHTML = "";
-      elBidHint.textContent = "Start the next round to enable bid inputs.";
-      elBattleBtn.disabled = true;
-      elClearBidsBtn.disabled = true;
-      resetBattleUI();
-    }
+    promptNextRound();
   });
 
   elClearBidsBtn.addEventListener("click", () => {
