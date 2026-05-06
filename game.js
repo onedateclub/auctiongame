@@ -72,6 +72,121 @@
   const elLog = document.getElementById("log");
   const elEndNote = document.getElementById("endNote");
   const resetBtn = document.getElementById("resetBtn");
+  const timerBtn = document.getElementById("timerBtn");
+  const timerModal = document.getElementById("timerModal");
+  const timerCloseBtn = document.getElementById("timerCloseBtn");
+  const timerInput = document.getElementById("timerInput");
+  const timerStartBtn = document.getElementById("timerStartBtn");
+  const timerResetBtn = document.getElementById("timerResetBtn");
+  const timerDisplay = document.getElementById("timerDisplay");
+  const timerStatus = document.getElementById("timerStatus");
+
+  let timerInterval = null;
+  let timerRemaining = 120;
+  let timerRunning = false;
+
+  const formatTime = (seconds) => {
+    const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const secs = String(seconds % 60).padStart(2, "0");
+    return `${mins}:${secs}`;
+  };
+
+  const parseTime = (value) => {
+    const parts = value.trim().split(":");
+    if(parts.length !== 2) return NaN;
+    const mins = Number(parts[0]);
+    const secs = Number(parts[1]);
+    if(!Number.isFinite(mins) || !Number.isFinite(secs) || secs < 0 || secs > 59 || mins < 0) return NaN;
+    return mins * 60 + secs;
+  };
+
+  const updateTimerUI = () => {
+    timerDisplay.textContent = formatTime(timerRemaining);
+    timerStatus.textContent = timerRunning ? "運行中" : (timerRemaining === 0 ? "時間到！" : "準備就緒");
+    timerStartBtn.textContent = timerRunning ? "停止" : "開始";
+    timerModal.querySelector(".timer-card").classList.toggle("timer-finish", timerRemaining === 0 && !timerRunning);
+  };
+
+  const stopTimer = () => {
+    timerRunning = false;
+    if(timerInterval){
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    updateTimerUI();
+  };
+
+  const finishTimer = () => {
+    stopTimer();
+    timerRemaining = 0;
+    timerStatus.textContent = "討論結束！";
+    timerDisplay.textContent = "00:00";
+    timerModal.querySelector(".timer-card").classList.add("timer-finish");
+  };
+
+  const startTimer = () => {
+    const seconds = parseTime(timerInput.value || "");
+    if(!Number.isFinite(seconds) || seconds <= 0){
+      timerStatus.textContent = "請輸入有效時間 mm:ss";
+      timerModal.querySelector(".timer-card").classList.remove("timer-finish");
+      return;
+    }
+    timerRemaining = seconds;
+    timerRunning = true;
+    updateTimerUI();
+    timerInterval = setInterval(() => {
+      timerRemaining -= 1;
+      if(timerRemaining <= 0){
+        finishTimer();
+      } else {
+        updateTimerUI();
+      }
+    }, 1000);
+  };
+
+  const resetTimer = () => {
+    stopTimer();
+    const seconds = parseTime(timerInput.value || "");
+    timerRemaining = Number.isFinite(seconds) && seconds >= 0 ? seconds : 120;
+    timerInput.value = formatTime(timerRemaining);
+    timerModal.querySelector(".timer-card").classList.remove("timer-finish");
+    updateTimerUI();
+  };
+
+  const openTimer = () => {
+    timerModal.style.display = "flex";
+    timerModal.setAttribute("aria-hidden", "false");
+    timerInput.value = formatTime(timerRemaining > 0 ? timerRemaining : 30);
+    updateTimerUI();
+    timerInput.focus();
+  };
+
+  const closeTimer = () => {
+    timerModal.style.display = "none";
+    timerModal.setAttribute("aria-hidden", "true");
+    stopTimer();
+  };
+
+  timerBtn.addEventListener("click", openTimer);
+  timerCloseBtn.addEventListener("click", closeTimer);
+  timerResetBtn.addEventListener("click", resetTimer);
+  timerStartBtn.addEventListener("click", () => {
+    timerRunning ? stopTimer() : startTimer();
+  });
+  timerInput.addEventListener("input", () => {
+    if(!timerRunning){
+      const seconds = parseTime(timerInput.value || "");
+      if(Number.isFinite(seconds) && seconds >= 0){
+        timerRemaining = seconds;
+      }
+      updateTimerUI();
+    }
+  });
+  timerModal.addEventListener("click", (event) => {
+    if(event.target === timerModal){
+      closeTimer();
+    }
+  });
   
   function showError(msg){
     elErrorBox.style.display = "block";
@@ -538,6 +653,7 @@
 
     elEndNote.style.display = "none";
     elEndNote.innerHTML = "";
+    closeTimer();
 
     renderTeams();
     renderRoundButtons();
