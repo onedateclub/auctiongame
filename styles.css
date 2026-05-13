@@ -42,7 +42,7 @@ body{
 .nav{
   position: sticky; top:0; z-index: 5;
   display:flex; align-items:center; justify-content:space-between;
-  padding:8px 12px;
+  padding:8px 10px;
   background: rgba(255,255,255,.78);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
@@ -216,9 +216,9 @@ body{
 }
 
 .wrap{
-  max-width: 1400px;
+  max-width: 1300px;
   margin: 18px auto 28px;
-  padding: 0 14px;
+  padding: 0 12px;
 }
 .wrap.grid{
   display:grid;
@@ -245,7 +245,7 @@ body{
 .card-h h2, .card-h h3{
   margin:0; font-size: 20px; letter-spacing:.2px;
 }
-.card-b{ padding: 16px; }
+.card-b{ padding: 14px; }
 
 .muted{ color: var(--muted); }
 .small{ font-size: 16px; color: rgba(107,91,109,.85); font-weight:800; }
@@ -265,7 +265,7 @@ body{
 /* Rounds */
 .rounds{ display:flex; flex-wrap:wrap; gap:10px; }
 .roundBtn{
-  min-width: 100px;
+  min-width: 90px;
   display:flex; flex-direction:column; gap:4px;
   align-items:flex-start;
   padding:10px 12px;
@@ -296,7 +296,7 @@ body{
 /* Main game area */
 .grid2{
   display:grid;
-  grid-template-columns: 1.1fr .9fr;
+  grid-template-columns: 1fr 0.9fr;
   gap: 16px;
   align-items:start;
 }
@@ -383,7 +383,7 @@ input[type="number"]:focus{
 .topGrid{
   display:grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   margin-top: 10px;
 }
 @media (max-width: 560px){

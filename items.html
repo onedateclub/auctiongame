@@ -60,16 +60,19 @@
     return `
       <div class="item">
         <div class="left">
+          <div class="desc">${it.id}</div>
           <div class="icon">${it.icon}</div>
           <div>
-            <div class="name">拍賣品 ${it.id}</div>
-            <div class="desc">${it.desc}</div>
+            <div class="name">${it.desc}</div>
           </div>
         </div>
         <div class="tag">${tag}</div>
       </div>
     `;
   }).join("");
+  list.style.display = 'grid';
+  list.style.gridTemplateColumns = 'repeat(2, 1fr)';
+  list.style.gap = '15px';
 })();
 </script>
   <!--<footer class="footer">

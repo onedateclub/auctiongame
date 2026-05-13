@@ -241,10 +241,10 @@
             <span class="dot" style="background:${t.color};"></span>
             <div>
               <div style="font-weight:1000;">${t.name}</div>
-              <div class="small">鑽石餘額</div>
             </div>
           </div>
           <div class="diamond" title="Diamonds">
+            <div class="small">餘額</div>
             <span class="diaIcon" aria-hidden="true"></span>
             <span>${t.diamonds}</span>
           </div>
@@ -444,31 +444,36 @@
   }
 
 
-  function renderCandidatesAndWinnerPick(info){
-    const { candidates, top1, top2 } = info;
+  function renderCandidatesAndWinnerPick(roundId, info){
+    const round = state.rounds[roundId - 1];
     elTopGrid.innerHTML = "";
 
-    candidates.forEach(c => {
-      const rank = (c.bid === top1) ? "Top 1" : "Top 2";
+    const allTeamsWithBids = state.teams.map(t => ({
+      ...t,
+      bid: round.bids[t.id]
+    })).sort((a, b) => b.bid - a.bid);
+
+    allTeamsWithBids.forEach((t, index) => {
+      const rank = index + 1;
       const card = document.createElement("div");
       card.className = "topCard";
       card.innerHTML = `
-        <div class="rank">${rank}</div>
         <div class="who" style="display:flex; gap:10px; align-items:center;">
-          <span class="dot" style="background:${c.color};"></span>
-          <span>${c.name}</span>
+          <span class="dot" style="background:${t.color};"></span>
+          <span>${t.name}</span>
         </div>
-        <div class="price">Bid: ${c.bid}</div>
+        <div class="price">Bid: ${t.bid}</div>
       `;
       elTopGrid.appendChild(card);
     });
 
+    const top2 = allTeamsWithBids.slice(0, 2);
     elWinnerPick.innerHTML = `<div class="muted" style="font-weight:1000;">評判選出中標隊伍:</div>`;
-    candidates.forEach(c => {
+    top2.forEach(c => {
       const label = document.createElement("label");
       label.className = "radioPill";
       label.innerHTML = `
-        <input type="radio" name="winner" value="${c.teamId}" />
+        <input type="radio" name="winner" value="${c.id}" />
         <span style="display:flex; gap:8px; align-items:center;">
           ${c.name}
         </span>
@@ -509,15 +514,18 @@
   function addLog(roundId, winnerTeamId, winningBid, candidates){
     const item = items[roundId - 1];
     const winner = state.teams[winnerTeamId];
+    const round = state.rounds[roundId - 1];
 
-    const candText = candidates.map(c => `${c.name} 出價 (${c.bid}) 鑽石`).join(" • ");
+    const candText = candidates.map(c => `${c.name} : (${c.bid}) 鑽石`).join(" • ");
+    const allBidsText = state.teams.map(t => `${t.name} 出價 (${round.bids[t.id]}) 鑽石`).join(" • ");
 
     const html = `
       <div style="font-weight:1000;">Item ${roundId}: ${item.icon} ${item.desc}</div>
-      <div class="muted">出線隊伍: ${candText}</div>
+      <div class="muted">出價: ${allBidsText}</div>
+      <!--<div class="muted">出線隊伍: ${candText}</div>-->
       <div style="margin-top:6px;">
-        中標者: <b>${winner.name}</b> 支付 <b>${winningBid}</b> 鑽石。
-        剩餘: <b>${winner.diamonds}</b>
+        中標者: <b>${winner.name}</b> 支付 <b>${winningBid}</b> 鑽石
+        <!--剩餘: <b>${winner.diamonds}</b>-->
       </div>
     `;
     state.log = state.log || [];
@@ -603,7 +611,7 @@
     elBattleBox.style.display = "block";
     elBidBox.style.display = "none";
     elConfirmWinnerBtn.disabled = true;
-    renderCandidatesAndWinnerPick(info);
+    renderCandidatesAndWinnerPick(roundId, info);
   });
 
   elConfirmWinnerBtn.addEventListener("click", () => {
