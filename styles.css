@@ -215,6 +215,7 @@ body{
   to{ transform: scale(1.02); }
 }
 
+/* Page ratio, fr for main panel, px for right team panel*/
 .wrap{
   max-width: 1300px;
   margin: 18px auto 28px;
@@ -222,7 +223,7 @@ body{
 }
 .wrap.grid{
   display:grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr 300px;
   gap: 16px;
 }
 @media (max-width: 980px){
