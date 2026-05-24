@@ -445,6 +445,7 @@
 
 
   function renderCandidatesAndWinnerPick(roundId, info){
+    const { candidates, top1, top2 } = info;
     const round = state.rounds[roundId - 1];
     elTopGrid.innerHTML = "";
 
@@ -467,13 +468,12 @@
       elTopGrid.appendChild(card);
     });
 
-    const top2 = allTeamsWithBids.slice(0, 2);
     elWinnerPick.innerHTML = `<div class="muted" style="font-weight:1000;">評判選出中標隊伍:</div>`;
-    top2.forEach(c => {
+    candidates.forEach(c => {
       const label = document.createElement("label");
       label.className = "radioPill";
       label.innerHTML = `
-        <input type="radio" name="winner" value="${c.id}" />
+        <input type="radio" name="winner" value="${c.teamId}" />
         <span style="display:flex; gap:8px; align-items:center;">
           ${c.name}
         </span>
