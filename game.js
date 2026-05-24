@@ -72,6 +72,8 @@
   const elConfirmWinnerBtn = document.getElementById("confirmWinnerBtn");
   const elLog = document.getElementById("log");
   const elEndNote = document.getElementById("endNote");
+  const elWinningModal = document.getElementById("winningModal");
+  const elWinningTeamName = document.getElementById("winningTeamName");
   const resetBtn = document.getElementById("resetBtn");
   const timerBtn = document.getElementById("timerBtn");
   const timerModal = document.getElementById("timerModal");
@@ -230,7 +232,7 @@
     state.teams.forEach(t => {
       const winsHtml = (t.wins || []).map(itemId => {
         const it = getItemById(itemId);
-        return it ? `<span class="winBadge" title="Won: ${it.name}">${it.icon}</span>` : "";
+        return it ? `<span class="winBadge" title="Won: ${it.desc}">${it.icon}</span>` : "";
       }).join("");
 
       const row = document.createElement("div");
@@ -554,6 +556,17 @@
     `;
   }
 
+  function showWinningEffect(teamName){
+    elWinningTeamName.textContent = teamName;
+    elWinningModal.style.display = "flex";
+    elWinningModal.setAttribute("aria-hidden", "false");
+    
+    setTimeout(() => {
+      elWinningModal.style.display = "none";
+      elWinningModal.setAttribute("aria-hidden", "true");
+    }, 2000);
+  }
+
   function promptNextRound(){
     const nextId = completedCount() + 1;
     if(nextId <= ROUND_COUNT){
@@ -656,6 +669,10 @@
 
     const candidates = round.topCandidates?.candidates || [];
     addLog(roundId, winnerTeamId, winningBid, candidates);
+    
+    // Show winning effect
+    showWinningEffect(winnerTeam.name);
+    
     lockRound(roundId);
     promptNextRound();
   });

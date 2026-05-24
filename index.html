@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>One Date Club — Life Auction Game</title>
+  <title>One Date Club — Life Treasures Auction</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
@@ -12,7 +12,7 @@
     <div class="brand">
       <div class="logo" aria-hidden="true"></div>
       <div>
-        One Date Club — Life Auction Game 人生拍賣遊戲
+        One Date Club — 人生價值拍賣行
         <!--<div class="small">5 teams • 8 rounds • Start with 100 diamonds</div>-->
       </div>
     </div>
@@ -144,6 +144,18 @@
           <button class="btn primary" id="timerStartBtn">開始</button>
           <button class="btn" id="timerResetBtn">重設</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Winning Effect Modal -->
+  <div class="winning-modal" id="winningModal" aria-hidden="true">
+    <div class="winning-overlay"></div>
+    <div class="winning-card" role="dialog" aria-modal="true">
+      <div class="winning-content">
+        <div class="winning-emoji">🎊</div>
+        <div class="winning-text">中標！</div>
+        <div class="winning-team" id="winningTeamName"></div>
       </div>
     </div>
   </div>
