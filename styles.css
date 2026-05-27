@@ -248,6 +248,32 @@ body{
 }
 .card-b{ padding: 14px; }
 
+.team-grid{
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.team-card{
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.95);
+  border: 1px solid rgba(43,42,51,.08);
+  box-shadow: 0 16px 34px rgba(43,42,51,.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.team-card strong{
+  font-size: 18px;
+}
+
+@media (max-width: 960px){
+  .team-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px){
+  .team-grid{ grid-template-columns: 1fr; }
+}
+
 .muted{ color: var(--muted); }
 .small{ font-size: 16px; color: rgba(107,91,109,.85); font-weight:800; }
 
@@ -421,6 +447,7 @@ input[type="number"]:focus{
 
 /* Right panel: teams + diamonds + wins */
 .teamList{ display:flex; flex-direction:column; gap:10px; }
+.teamListGrid{ display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; }
 .teamCard{
   display:flex; flex-direction:column; gap:10px;
   padding: 12px 12px;
@@ -468,6 +495,99 @@ input[type="number"]:focus{
   font-size: 20px;
 }
 .winBadge[title]{ cursor: help; }
+
+.teamHistory{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top: 14px;
+}
+.teamItemsRow{
+  display:grid;
+  gap: 8px;
+}
+.teamItemRow{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255,250,214,.85);
+  border: 1px solid rgba(255,212,59,.30);
+}
+.teamItemIcon{
+  width: 30px;
+  height: 30px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius: 12px;
+  background: rgba(255,255,255,.95);
+  font-size: 16px;
+}
+.teamRoundItem{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(43,42,51,.10);
+  background: rgba(255,255,255,.92);
+}
+.teamRoundItem.winItem{
+  background: linear-gradient(135deg, rgba(255,230,230,.95), rgba(255,200,200,.60));
+  border-color: rgba(220,38,38,.25);
+  box-shadow: 0 8px 20px rgba(220,38,38,.08);
+}
+.teamRoundItem.winItem .teamRoundName,
+.teamRoundItem.winItem .teamRoundPrice{
+  color: #b00020;
+  font-weight: 900;
+}
+.teamRoundItem .itemLeft{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  min-width: 0;
+  position:relative;
+}
+.teamRoundRank{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:rgba(255,212,59,.90);
+  color:#2b2a33;
+  font-weight:900;
+  font-size:12px;
+  margin-right:-8px;
+  z-index:2;
+  box-shadow:0 2px 8px rgba(255,212,59,.30);
+  flex-shrink:0;
+}
+.teamRoundIcon{
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(255,250,214,.95);
+  border: 1px solid rgba(43,42,51,.10);
+  font-size: 20px;
+  flex-shrink:0;
+}
+.teamRoundName{
+  font-weight: 900;
+}
+.teamRoundPrice{
+  font-weight: 900;
+  color: #8b5a00;
+  white-space: nowrap;
+}
 
 /* Log */
 .log{ display:flex; flex-direction:column; gap:10px; margin-top: 12px; }

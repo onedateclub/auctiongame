@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>One Date Club — Team Auction Summary</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        One Date Club — 隊伍拍賣摘要
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <a class="btn" href="index.html">🏠 返回遊戲</a>
+      <a class="btn" href="items.html">🧾 拍賣目錄</a>
+      <a class="btn" href="rules.html">📜 遊戲規則</a>
+      <a class="btn primary" href="teams.html">👥 隊伍列表</a>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <section class="card">
+      <div class="card-h">
+        <h2>隊伍拍賣摘要</h2>
+        <span class="pill">出價歷史</span>
+      </div>
+      <div class="card-b teamList teamListGrid" id="teamList"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h">
+        <h3>成交紀錄</h3>
+      </div>
+      <div class="card-b">
+        <div class="log" id="log"></div>
+      </div>
+    </section>
+  </main>
+  
+  <script src="constant.js"></script>
+  <script>
+    (function() {
+      function freshState() {
+        return {
+          teams: Array.from({ length: TEAM_COUNT }, (_, i) => ({
+            id: i,
+            name: TEAM_NAMES[i] || `Team ${String.fromCharCode(65 + i)}`,
+            diamonds: START_DIAMONDS,
+            color: teamColors[i % teamColors.length],
+            wins: []
+          })),
+          rounds: Array.from({ length: ROUND_COUNT }, (_, i) => ({
+            id: i + 1,
+            bids: Array(TEAM_COUNT).fill(null),
+            winnerTeamId: null,
+            winningBid: null
+          })),
+          log: []
+        };
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return freshState();
+          const parsed = JSON.parse(raw);
+          if (!parsed?.teams || !parsed?.rounds) return freshState();
+
+          const teams = (parsed.teams || []).slice(0, TEAM_COUNT).map((team, i) => ({
+            id: i,
+            name: TEAM_NAMES[i] || team.name || `Team ${String.fromCharCode(65 + i)}`,
+            diamonds: Number.isFinite(team.diamonds) ? team.diamonds : START_DIAMONDS,
+            color: team.color || teamColors[i % teamColors.length],
+            wins: Array.isArray(team.wins) ? team.wins : []
+          }));
+
+          const rounds = (parsed.rounds || []).slice(0, ROUND_COUNT).map((round, i) => ({
+            id: i + 1,
+            bids: Array.isArray(round.bids) ? round.bids.slice(0, TEAM_COUNT) : Array(TEAM_COUNT).fill(null),
+            winnerTeamId: Number.isFinite(round.winnerTeamId) ? round.winnerTeamId : null,
+            winningBid: Number.isFinite(round.winningBid) ? round.winningBid : null
+          }));
+
+          return {
+            teams,
+            rounds,
+            log: Array.isArray(parsed.log) ? parsed.log : []
+          };
+        } catch {
+          return freshState();
+        }
+      }
+
+      function getItemById(id) {
+        return items.find(x => x.id === id) || { icon: "❔", name: `物品 ${id}` };
+      }
+
+      function renderTeams(state) {
+        const elTeamList = document.getElementById("teamList");
+        elTeamList.innerHTML = "";
+
+        state.teams.forEach(team => {
+          const card = document.createElement("div");
+          card.className = "teamCard";
+
+          // Calculate rank map for this team across all rounds
+          // Get all bids for this team and create a rank based on bid amounts
+          const teamBids = state.rounds.map(round => round.bids?.[team.id]).filter(b => Number.isFinite(b));
+          const uniqueSortedBids = [...new Set(teamBids)].sort((a, b) => b - a); // Unique bids, sorted descending (highest first)
+          const rankMap = {};
+          uniqueSortedBids.forEach((bid, index) => {
+            rankMap[bid] = index + 1;
+          });
+
+          const historyRows = state.rounds.map(round => {
+            const item = getItemById(round.id);
+            const bid = round.bids?.[team.id];
+            const won = round.winnerTeamId !== null && round.winnerTeamId === team.id;
+            const isRoundComplete = round.winnerTeamId !== null;
+            const priceText = Number.isFinite(bid) ? `${bid} ` : "未出價";
+            const statusText = won ? "中標" : (isRoundComplete ? "出價" : "");
+            
+            // Get rank within this team: rank is based on bid amount relative to this team's other bids
+            let rank = null;
+            if (Number.isFinite(bid)) {
+              rank = rankMap[bid];
+            }
+
+            return `
+              <div class="teamRoundItem ${won ? "winItem" : ""}">
+                <div class="itemLeft">
+                  ${rank ? `<div class="teamRoundRank">${rank}</div>` : ''}
+                  <div class="teamRoundIcon">${item.icon}</div>
+                  <div>
+                    <div class="small">${statusText}</div>
+                  </div>
+                </div>
+                <div class="teamRoundPrice">${priceText}</div>
+              </div>
+            `;
+          }).join("");
+
+          const winsBadges = (team.wins || []).map(id => {
+            const item = getItemById(id);
+            return `<span class="winBadge" title="中標：${item.name}">${item.icon}</span>`;
+          }).join("");
+
+          const allItemsHtml = items.map(item => `
+            <div class="teamItemRow">
+              <span class="teamItemIcon">${item.icon}</span>
+              <span>${item.name}</span>
+            </div>
+          `).join("");
+
+          card.innerHTML = `
+            <div class="teamTopRow">
+              <div class="teamLeft">
+                <span class="dot" style="background:${team.color};"></span>
+                <div>
+                  <div style="font-weight:1000;">${team.name}</div>
+                  <div class="small">剩餘鑽石</div>
+                </div>
+              </div>
+              <div class="diamond">
+                <span class="diaIcon" aria-hidden="true"></span>
+                <span>${team.diamonds}</span>
+              </div>
+            </div>
+            <div class="teamHistory">${historyRows}</div>
+          `;
+
+          elTeamList.appendChild(card);
+        });
+      }
+
+      function renderLog(state) {
+        const elLog = document.getElementById("log");
+        elLog.innerHTML = "";
+
+        if (!state.log || state.log.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "logItem";
+          empty.textContent = "尚無成交紀錄。";
+          elLog.appendChild(empty);
+          return;
+        }
+
+        state.log.slice().reverse().forEach(entry => {
+          const div = document.createElement("div");
+          div.className = "logItem";
+          div.innerHTML = entry;
+          elLog.appendChild(div);
+        });
+      }
+
+      function init() {
+        const state = loadState();
+        renderTeams(state);
+        renderLog(state);
+      }
+
+      init();
+    })();
+  </script>
+  <!--<footer class="footer">
+    © 2026 Flow Church Actionable One Date Club — All Rights Reserved
+  </footer>-->
+</body>
+</html>
