@@ -30,7 +30,7 @@
         <h2>隊伍拍賣摘要</h2>
         <span class="pill">出價歷史</span>
       </div>
-      <div class="card-b teamList teamListGrid" id="teamList"></div>
+      <div class="card-b teamList teamTableWrapper" id="teamList"></div>
     </section>
 
     <section class="card">
@@ -105,78 +105,75 @@
         const elTeamList = document.getElementById("teamList");
         elTeamList.innerHTML = "";
 
-        state.teams.forEach(team => {
-          const card = document.createElement("div");
-          card.className = "teamCard";
+        const table = document.createElement("table");
+        table.className = "teamsTable";
 
-          // Calculate rank map for this team across all rounds
-          // Get all bids for this team and create a rank based on bid amounts
+        const rankMaps = state.teams.reduce((acc, team) => {
           const teamBids = state.rounds.map(round => round.bids?.[team.id]).filter(b => Number.isFinite(b));
-          const uniqueSortedBids = [...new Set(teamBids)].sort((a, b) => b - a); // Unique bids, sorted descending (highest first)
-          const rankMap = {};
-          uniqueSortedBids.forEach((bid, index) => {
-            rankMap[bid] = index + 1;
-          });
+          const uniqueSortedBids = [...new Set(teamBids)].sort((a, b) => b - a);
+          acc[team.id] = uniqueSortedBids.reduce((map, bid, index) => {
+            map[bid] = index + 1;
+            return map;
+          }, {});
+          return acc;
+        }, {});
 
-          const historyRows = state.rounds.map(round => {
-            const item = getItemById(round.id);
-            const bid = round.bids?.[team.id];
-            const won = round.winnerTeamId !== null && round.winnerTeamId === team.id;
-            const isRoundComplete = round.winnerTeamId !== null;
-            const priceText = Number.isFinite(bid) ? `${bid} ` : "未出價";
-            const statusText = won ? "中標" : (isRoundComplete ? "出價" : "");
-            
-            // Get rank within this team: rank is based on bid amount relative to this team's other bids
-            let rank = null;
-            if (Number.isFinite(bid)) {
-              rank = rankMap[bid];
-            }
-
-            return `
-              <div class="teamRoundItem ${won ? "winItem" : ""}">
-                <div class="itemLeft">
-                  ${rank ? `<div class="teamRoundRank">${rank}</div>` : ''}
-                  <div class="teamRoundIcon">${item.icon}</div>
-                  <div>
-                    <div class="small">${statusText}</div>
+        const headerHtml = `
+          <thead>
+            <tr>
+              <th class="teamsTableRoundHeader">拍賣品</th>
+              ${state.teams.map(team => `<th><div class="dot" style="background:${team.color}; display: inline-block;"></div>    ${team.name}</th>`).join("")}
+            </tr>
+            <tr class="teamsTableRound">
+              <th class="teamsTableRowHeader">
+                <div class="roundHeaderContent">
+                  <span class="teamRoundIcon">💎</span>
+                  <div class="roundHeaderText">
+                    <div class="teamRoundName">鑽石餘額</div>
                   </div>
                 </div>
-                <div class="teamRoundPrice">${priceText}</div>
-              </div>
-            `;
-          }).join("");
+              </th>
+              ${state.teams.map(team => `<td class="cellCenter"><div class="diamond">${team.diamonds}</div></td>`).join("")}
+            </tr>
+          </thead>
+        `;
 
-          const winsBadges = (team.wins || []).map(id => {
-            const item = getItemById(id);
-            return `<span class="winBadge" title="中標：${item.name}">${item.icon}</span>`;
-          }).join("");
+        const bodyHtml = state.rounds.map(round => {
+          const item = getItemById(round.id);
 
-          const allItemsHtml = items.map(item => `
-            <div class="teamItemRow">
-              <span class="teamItemIcon">${item.icon}</span>
-              <span>${item.name}</span>
-            </div>
-          `).join("");
-
-          card.innerHTML = `
-            <div class="teamTopRow">
-              <div class="teamLeft">
-                <span class="dot" style="background:${team.color};"></span>
-                <div>
-                  <div style="font-weight:1000;">${team.name}</div>
-                  <div class="small">剩餘鑽石</div>
+          return `
+            <tr class="teamsTableRound">
+              <th class="teamsTableRowHeader">
+                <div class="roundHeaderContent">
+                  <span class="teamRoundIcon">${item.icon}</span>
+                  <div class="roundHeaderText">
+                    <div class="teamRoundName">${item.desc}</div>
+                    <!--<div class="small">第 ${round.id} 回合</div>-->
+                  </div>
                 </div>
-              </div>
-              <div class="diamond">
-                <span class="diaIcon" aria-hidden="true"></span>
-                <span>${team.diamonds}</span>
-              </div>
-            </div>
-            <div class="teamHistory">${historyRows}</div>
-          `;
+              </th>
+              ${state.teams.map(team => {
+                const bid = round.bids?.[team.id];
+                const won = round.winnerTeamId !== null && round.winnerTeamId === team.id;
+                const rank = Number.isFinite(bid) ? rankMaps[team.id]?.[bid] : null;
+                const rankHtml = rank ? `<span class="cellRank">#${rank}</span>` : "";
+                const priceText = Number.isFinite(bid) ? `${rankHtml}${bid}` : "未出價";
+                const statusText = won ? "中標" : "";
 
-          elTeamList.appendChild(card);
-        });
+                return `
+                  <td class="${won ? "winCell" : ""}">
+                    <div class="cellPrice">${priceText}                     
+                      <!--${statusText ? `<div class="small cellStatus">${statusText}</div>` : ""}-->
+                    </div>
+                  </td>
+                `;
+              }).join("")}
+            </tr>
+          `;
+        }).join("");
+
+        table.innerHTML = headerHtml + `<tbody>${bodyHtml}</tbody>`;
+        elTeamList.appendChild(table);
       }
 
       function renderLog(state) {

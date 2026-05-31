@@ -400,6 +400,9 @@
       if(bid > state.teams[teamId].diamonds){
         return { ok:false, msg:`${state.teams[teamId].name}'s bid (${bid}) exceeds remaining diamonds (${state.teams[teamId].diamonds}).` };
       }
+      if(bid !== 0 && bid < 20){
+        return { ok:false, msg:`${state.teams[teamId].name}'s bid (${bid}) is below the minimum allowed bid (20).` };
+      }
     }
     return { ok:true };
   }
