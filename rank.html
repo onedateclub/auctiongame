@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>One Date Club — 優先級排名</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    #prioritySection * {
+      animation: none !important;
+      transition: none !important;
+    }
+    .priority-input {
+      animation: none !important;
+      transition: none !important;
+      background: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="nav">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        One Date Club — 優先次序設定
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <a class="btn" href="index.html">🏠 返回遊戲</a>
+      <a class="btn" href="items.html">🧾 拍賣目錄</a>
+      <a class="btn" href="rules.html">📜 遊戲規則</a>
+      <a class="btn primary" href="rank.html">🎯 排名</a>
+      <a class="btn" href="teams.html">👥 隊伍列表</a>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <section class="card" id="prioritySection">
+      <div class="card-h">
+        <h2>優先次序設定</h2>
+        <span class="pill" id="statusPill">設定中</span>
+      </div>
+      <div class="card-b" id="prioritySettings"></div>
+    </section>
+
+    <section class="card" id="statusCard" style="display:none;">
+      <div class="card-h">
+        <h2>遊戲狀態</h2>
+      </div>
+      <div class="card-b" id="statusContent" style="font-size:16px; line-height:1.6;">
+      </div>
+    </section>
+  </main>
+
+  <script src="constant.js"></script>
+  <script>
+    (function() {
+      function loadGameState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+
+      function saveGameState(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function getItemById(id) {
+        return items.find(x => x.id === id) || { icon: "❔", desc: `物品 ${id}` };
+      }
+
+      function isGameStarted(fullState) {
+        if (!fullState?.rounds) return false;
+        return fullState.rounds.some(r => r.started);
+      }
+
+      function isGameComplete(fullState) {
+        if (!fullState?.rounds) return false;
+        return fullState.rounds.every(r => r.done);
+      }
+
+      function renderPrioritySettings(fullState) {
+        const section = document.getElementById("prioritySection");
+        const statusCard = document.getElementById("statusCard");
+        const container = document.getElementById("prioritySettings");
+        const statusPill = document.getElementById("statusPill");
+
+        if (isGameComplete(fullState)) {
+          section.style.display = "block";
+          statusCard.style.display = "none";
+          statusPill.textContent = "遊戲已完成";
+        } else if (isGameStarted(fullState)) {
+          section.style.display = "block";
+          statusCard.style.display = "none";
+          const started = fullState.rounds.filter(r => r.started).length;
+          statusPill.textContent = `進行中 (${started}/${ROUND_COUNT})`;
+        } else {
+          statusPill.textContent = "設定中";
+        }
+
+        section.style.display = "block";
+        statusCard.style.display = "none";
+        container.innerHTML = "";
+
+        const table = document.createElement("table");
+        table.className = "priorityTable";
+        table.style.width = "100%";
+        table.style.borderCollapse = "collapse";
+
+        const headerRow = document.createElement("tr");
+        headerRow.innerHTML = `
+          <th style="border:1px solid var(--border); padding:12px; text-align:left; background:rgba(255,255,255,.95);">物品</th>
+          ${fullState.teams.map(team => `<th style="border:1px solid var(--border); padding:12px; text-align:center; background:rgba(255,255,255,.95);"><div class="dot" style="background:${team.color}; display:inline-block; width:12px; height:12px; border-radius:3px;"></div> ${team.name}</th>`).join("")}
+        `;
+        table.appendChild(headerRow);
+
+        const priorityConfirmed = fullState.priorityConfirmed || false;
+
+        fullState.rounds.forEach(round => {
+          const item = getItemById(round.id);
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td style="border:1px solid var(--border); padding:12px; background:rgba(250,250,250,.95); font-weight:900;">
+              <span style="font-size:20px; margin-right:8px;">${item.icon}</span>${item.desc}
+            </td>
+            ${fullState.teams.map(team => {
+              const currentPriority = team.itemPriorities?.[round.id] || "";
+              const isDisabled = priorityConfirmed || isGameStarted(fullState);
+              return `
+                <td style="border:1px solid var(--border); padding:12px; text-align:center;">
+                  <input type="text" class="priority-input" data-team-id="${team.id}" data-item-id="${round.id}" placeholder="-" value="${currentPriority || ""}" ${isDisabled ? "disabled" : ""} style="padding:6px; border-radius:6px; border:1px solid var(--border); width:50px; text-align:center; background:none; transition:none;" />
+                </td>
+              `;
+            }).join("")}
+          `;
+          table.appendChild(row);
+        });
+
+        container.appendChild(table);
+
+        // Add error message container
+        const errorContainer = document.createElement("div");
+        errorContainer.style.marginTop = "12px";
+        errorContainer.style.color = "#b0004b";
+        errorContainer.style.fontSize = "14px";
+        errorContainer.style.fontWeight = "900";
+        errorContainer.style.display = "none";
+        container.appendChild(errorContainer);
+
+        // Add buttons
+        const buttonContainer = document.createElement("div");
+        buttonContainer.style.marginTop = "16px";
+        buttonContainer.style.display = "flex";
+        buttonContainer.style.gap = "10px";
+        buttonContainer.style.justifyContent = "flex-end";
+
+        const confirmBtn = document.createElement("button");
+        const gameStarted = isGameStarted(fullState);
+        const gameComplete = isGameComplete(fullState);
+        
+        if (gameComplete) {
+          confirmBtn.textContent = "遊戲已完成";
+          confirmBtn.disabled = true;
+          confirmBtn.style.background = "rgba(150,150,150,.3)";
+        } else if (gameStarted) {
+          confirmBtn.textContent = "進行中（已鎖定）";
+          confirmBtn.disabled = true;
+          confirmBtn.style.background = "rgba(150,150,150,.3)";
+        } else if (priorityConfirmed) {
+          confirmBtn.textContent = "已確認";
+          confirmBtn.disabled = true;
+          confirmBtn.style.background = "rgba(100,200,100,.3)";
+        } else {
+          confirmBtn.textContent = "確認";
+          confirmBtn.disabled = false;
+          confirmBtn.style.background = "rgba(100,200,100,.8)";
+        }
+        
+        confirmBtn.style.padding = "10px 16px";
+        confirmBtn.style.borderRadius = "8px";
+        confirmBtn.style.border = "1px solid var(--border)";
+        confirmBtn.style.color = "#2b2a33";
+        confirmBtn.style.fontWeight = "900";
+        confirmBtn.style.cursor = confirmBtn.disabled ? "default" : "pointer";
+
+        const resetBtn = document.createElement("button");
+        resetBtn.textContent = "清空";
+        resetBtn.style.padding = "10px 16px";
+        resetBtn.style.borderRadius = "8px";
+        resetBtn.style.border = "1px solid var(--border)";
+        resetBtn.style.background = (gameStarted || gameComplete) ? "rgba(150,150,150,.3)" : "rgba(200,100,100,.8)";
+        resetBtn.style.color = "#2b2a33";
+        resetBtn.style.fontWeight = "900";
+        resetBtn.style.cursor = (gameStarted || gameComplete) ? "default" : "pointer";
+        resetBtn.disabled = gameStarted || gameComplete;
+
+        confirmBtn.addEventListener("click", () => {
+          // Validate all priority inputs
+          const inputs = Array.from(document.querySelectorAll(".priority-input"));
+          let isValid = true;
+          let errorMsg = "";
+          const teamRankMap = new Map();
+
+          inputs.forEach(input => {
+            input.style.borderColor = "";
+          });
+
+          inputs.forEach(input => {
+            const value = input.value.trim();
+            const teamId = input.dataset.teamId;
+
+            if (value !== "") {
+              const num = Number(value);
+              if (!Number.isFinite(num) || num < 1 || num > ROUND_COUNT || Math.floor(num) !== num) {
+                if (!errorMsg) errorMsg = `優先級必須是 1 到 ${ROUND_COUNT} 之間的整數`;
+                isValid = false;
+                input.style.borderColor = "red";
+                return;
+              }
+
+              const ranks = teamRankMap.get(teamId) || {};
+              if (ranks[num]) {
+                if (!errorMsg) errorMsg = "同一隊伍的優先級不得重複";
+                isValid = false;
+                input.style.borderColor = "red";
+                ranks[num].style.borderColor = "red";
+              } else {
+                ranks[num] = input;
+                teamRankMap.set(teamId, ranks);
+              }
+            }
+          });
+
+          if (!isValid) {
+            errorContainer.textContent = errorMsg;
+            errorContainer.style.display = "block";
+            return;
+          }
+
+          errorContainer.style.display = "none";
+          errorContainer.textContent = "";
+          fullState.priorityConfirmed = true;
+          saveGameState(fullState);
+          statusPill.textContent = "已確認";
+          renderPrioritySettings(fullState);
+        });
+
+        resetBtn.addEventListener("click", () => {
+          if (confirm("確定要重置所有優先級嗎？")) {
+            fullState.teams.forEach(team => {
+              team.itemPriorities = {};
+            });
+            fullState.priorityConfirmed = false;
+            saveGameState(fullState);
+            statusPill.textContent = "設定中";
+            renderPrioritySettings(fullState);
+          }
+        });
+
+        buttonContainer.appendChild(confirmBtn);
+        buttonContainer.appendChild(resetBtn);
+        container.appendChild(buttonContainer);
+
+        // Attach event listeners to priority inputs (only if not confirmed and game not started)
+        if (!priorityConfirmed && !isGameStarted(fullState)) {
+          document.querySelectorAll(".priority-input").forEach(input => {
+            const updatePriority = (e) => {
+              const teamId = Number(e.target.dataset.teamId);
+              const itemId = Number(e.target.dataset.itemId);
+              const value = e.target.value.trim();
+              const priority = value !== "" ? Number(value) : null;
+
+              fullState.teams[teamId].itemPriorities = fullState.teams[teamId].itemPriorities || {};
+              if (priority === null || !Number.isFinite(priority)) {
+                delete fullState.teams[teamId].itemPriorities[itemId];
+              } else {
+                fullState.teams[teamId].itemPriorities[itemId] = priority;
+              }
+              saveGameState(fullState);
+            };
+            input.addEventListener("input", updatePriority);
+            input.addEventListener("change", updatePriority);
+          });
+        }
+      }
+
+      function init() {
+        const fullState = loadGameState();
+        if (!fullState) return;
+        renderPrioritySettings(fullState);
+      }
+
+      function refreshDisplay() {
+        const fullState = loadGameState();
+        if (!fullState) return;
+        renderPrioritySettings(fullState);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

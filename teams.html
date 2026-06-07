@@ -20,96 +20,151 @@
       <a class="btn" href="index.html">🏠 返回遊戲</a>
       <a class="btn" href="items.html">🧾 拍賣目錄</a>
       <a class="btn" href="rules.html">📜 遊戲規則</a>
+      <a class="btn" href="rank.html">🎯 排名</a>
       <a class="btn primary" href="teams.html">👥 隊伍列表</a>
     </div>
   </div>
 
   <main class="wrap">
+    <section class="card" id="scoreSection" style="display:none; margin-bottom: 18px;">
+      <div class="card-h">
+        <h2>最終評分</h2>
+        <span class="pill">遊戲完成</span>
+      </div>
+      <div class="card-b" id="scoreDisplay"></div>
+    </section>
+
     <section class="card">
       <div class="card-h">
         <h2>隊伍拍賣摘要</h2>
         <span class="pill">出價歷史</span>
       </div>
-      <div class="card-b teamList teamTableWrapper" id="teamList"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-h">
-        <h3>成交紀錄</h3>
-      </div>
-      <div class="card-b">
-        <div class="log" id="log"></div>
-      </div>
+      <div class="card-b teamTableWrapper" id="teamList"></div>
     </section>
   </main>
   
   <script src="constant.js"></script>
   <script>
     (function() {
-      function freshState() {
-        return {
-          teams: Array.from({ length: TEAM_COUNT }, (_, i) => ({
-            id: i,
-            name: TEAM_NAMES[i] || `Team ${String.fromCharCode(65 + i)}`,
-            diamonds: START_DIAMONDS,
-            color: teamColors[i % teamColors.length],
-            wins: []
-          })),
-          rounds: Array.from({ length: ROUND_COUNT }, (_, i) => ({
-            id: i + 1,
-            bids: Array(TEAM_COUNT).fill(null),
-            winnerTeamId: null,
-            winningBid: null
-          })),
-          log: []
-        };
-      }
-
-      function loadState() {
+      function loadGameState() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
-          if (!raw) return freshState();
-          const parsed = JSON.parse(raw);
-          if (!parsed?.teams || !parsed?.rounds) return freshState();
-
-          const teams = (parsed.teams || []).slice(0, TEAM_COUNT).map((team, i) => ({
-            id: i,
-            name: TEAM_NAMES[i] || team.name || `Team ${String.fromCharCode(65 + i)}`,
-            diamonds: Number.isFinite(team.diamonds) ? team.diamonds : START_DIAMONDS,
-            color: team.color || teamColors[i % teamColors.length],
-            wins: Array.isArray(team.wins) ? team.wins : []
-          }));
-
-          const rounds = (parsed.rounds || []).slice(0, ROUND_COUNT).map((round, i) => ({
-            id: i + 1,
-            bids: Array.isArray(round.bids) ? round.bids.slice(0, TEAM_COUNT) : Array(TEAM_COUNT).fill(null),
-            winnerTeamId: Number.isFinite(round.winnerTeamId) ? round.winnerTeamId : null,
-            winningBid: Number.isFinite(round.winningBid) ? round.winningBid : null
-          }));
-
-          return {
-            teams,
-            rounds,
-            log: Array.isArray(parsed.log) ? parsed.log : []
-          };
+          if (!raw) return null;
+          return JSON.parse(raw);
         } catch {
-          return freshState();
+          return null;
         }
       }
 
-      function getItemById(id) {
-        return items.find(x => x.id === id) || { icon: "❔", name: `物品 ${id}` };
+      function saveGameState(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
 
-      function renderTeams(state) {
+      function getItemById(id) {
+        return items.find(x => x.id === id) || { icon: "❔", desc: `物品 ${id}` };
+      }
+
+      function isGameStarted(fullState) {
+        if (!fullState?.rounds) return false;
+        return fullState.rounds.some(r => r.started);
+      }
+
+      function isGameComplete(fullState) {
+        if (!fullState?.rounds) return false;
+        return fullState.rounds.every(r => r.done);
+      }
+
+      function calculateScore(team, fullState) {
+        if (!team.wins) return 0;
+        let score = 0;
+        team.wins.forEach(itemId => {
+          const priority = team.itemPriorities?.[itemId] || null;
+          if (priority === 1) score += 4;
+          else if (priority === 2) score += 3;
+          else if (priority === 3) score += 2;
+          else score += 1; // priority 4-6 or no priority = 1 point
+        });
+        return score;
+      }
+
+      function renderScoreDisplay(fullState) {
+        const section = document.getElementById("scoreSection");
+        const container = document.getElementById("scoreDisplay");
+
+        if (!isGameComplete(fullState)) {
+          section.style.display = "none";
+          return;
+        }
+
+        section.style.display = "block";
+        container.innerHTML = "";
+
+        const scores = fullState.teams.map(team => {
+          const score = calculateScore(team, fullState);
+          const itemsCount = Array.isArray(team.wins) ? team.wins.length : 0;
+          return {
+            ...team,
+            score,
+            itemsCount
+          };
+        }).sort((a, b) => {
+          // 1) points desc
+          if (b.score !== a.score) return b.score - a.score;
+          // 2) number of items desc
+          if (b.itemsCount !== a.itemsCount) return b.itemsCount - a.itemsCount;
+          // 3) remaining diamonds desc
+          return b.diamonds - a.diamonds;
+        });
+
+        const scoreTable = document.createElement("table");
+        scoreTable.className = "scoresTable";
+        scoreTable.style.width = "100%";
+        scoreTable.style.borderCollapse = "collapse";
+
+        const scoreHeaderRow = document.createElement("tr");
+        scoreHeaderRow.innerHTML = `
+          <th style="border:1px solid var(--border); padding:12px; text-align:left; background:rgba(255,255,255,.95); font-weight:900; white-space:nowrap;">排名</th>
+          <th style="border:1px solid var(--border); padding:12px; text-align:left; background:rgba(255,255,255,.95); font-weight:900; white-space:nowrap;">隊伍</th>
+          <th style="border:1px solid var(--border); padding:12px; text-align:center; background:rgba(255,255,255,.95); font-weight:900; white-space:nowrap;">得分</th>
+          <th style="border:1px solid var(--border); padding:12px; text-align:center; background:rgba(255,255,255,.95); font-weight:900; white-space:nowrap;">剩餘鑽石</th>
+          <th style="border:1px solid var(--border); padding:12px; text-align:left; background:rgba(255,255,255,.95); font-weight:900; white-space:nowrap;">獲得物品</th>
+        `;
+        scoreTable.appendChild(scoreHeaderRow);
+
+        scores.forEach((team, index) => {
+          const rank = index + 1;
+          const winsText = (team.wins || []).map(itemId => {
+            const item = getItemById(itemId);
+            const priority = team.itemPriorities?.[itemId] || null;
+            const priorityLabel = priority ? ` (優先 ${priority})` : "";
+            return `${item.icon} ${item.desc}${priorityLabel}`;
+          }).join(", ") || "無";
+
+          const row = document.createElement("tr");
+          const bgColor = rank === 1 ? "rgba(255,230,200,.6)" : (rank === 2 ? "rgba(230,240,255,.6)" : "");
+          row.style.background = bgColor;
+          row.innerHTML = `
+            <td style="border:1px solid var(--border); padding:12px; font-weight:900;">${rank}</td>
+            <td style="border:1px solid var(--border); padding:12px;">
+              <span class="dot" style="background:${team.color}; display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px;"></span>
+              ${team.name}
+            </td>
+            <td style="border:1px solid var(--border); padding:12px; text-align:center; font-weight:900; font-size:18px; color:#b0004b;">${team.score}</td>
+            <td style="border:1px solid var(--border); padding:12px; text-align:center; font-weight:900;">${team.diamonds}</td>
+            <td style="border:1px solid var(--border); padding:12px;">${winsText}</td>
+          `;
+          scoreTable.appendChild(row);
+        });
+
+        container.appendChild(scoreTable);
+      }
+
+      function renderTeams(fullState) {
         const elTeamList = document.getElementById("teamList");
         elTeamList.innerHTML = "";
 
-        const table = document.createElement("table");
-        table.className = "teamsTable";
-
-        const rankMaps = state.teams.reduce((acc, team) => {
-          const teamBids = state.rounds.map(round => round.bids?.[team.id]).filter(b => Number.isFinite(b));
+        const rankMaps = fullState.teams.reduce((acc, team) => {
+          const teamBids = fullState.rounds.map(round => round.bids?.[team.id]).filter(b => Number.isFinite(b));
           const uniqueSortedBids = [...new Set(teamBids)].sort((a, b) => b - a);
           acc[team.id] = uniqueSortedBids.reduce((map, bid, index) => {
             map[bid] = index + 1;
@@ -118,27 +173,19 @@
           return acc;
         }, {});
 
+        const table = document.createElement("table");
+        table.className = "teamsTable";
+
         const headerHtml = `
           <thead>
             <tr>
               <th class="teamsTableRoundHeader">拍賣品</th>
-              ${state.teams.map(team => `<th><div class="dot" style="background:${team.color}; display: inline-block;"></div>    ${team.name}</th>`).join("")}
-            </tr>
-            <tr class="teamsTableRound">
-              <th class="teamsTableRowHeader">
-                <div class="roundHeaderContent">
-                  <span class="teamRoundIcon">💎</span>
-                  <div class="roundHeaderText">
-                    <div class="teamRoundName">鑽石餘額</div>
-                  </div>
-                </div>
-              </th>
-              ${state.teams.map(team => `<td class="cellCenter"><div class="diamond">${team.diamonds}</div></td>`).join("")}
+              ${fullState.teams.map(team => `<th><div class="dot" style="background:${team.color}; display: inline-block;"></div> ${team.name}</th>`).join("")}
             </tr>
           </thead>
         `;
 
-        const bodyHtml = state.rounds.map(round => {
+        const bodyHtml = fullState.rounds.map(round => {
           const item = getItemById(round.id);
 
           return `
@@ -148,23 +195,20 @@
                   <span class="teamRoundIcon">${item.icon}</span>
                   <div class="roundHeaderText">
                     <div class="teamRoundName">${item.desc}</div>
-                    <!--<div class="small">第 ${round.id} 回合</div>-->
                   </div>
                 </div>
               </th>
-              ${state.teams.map(team => {
+              ${fullState.teams.map(team => {
                 const bid = round.bids?.[team.id];
                 const won = round.winnerTeamId !== null && round.winnerTeamId === team.id;
-                const rank = Number.isFinite(bid) ? rankMaps[team.id]?.[bid] : null;
-                const rankHtml = rank ? `<span class="cellRank">#${rank}</span>` : "";
-                const priceText = Number.isFinite(bid) ? `${rankHtml}${bid}` : "未出價";
-                const statusText = won ? "中標" : "";
+                const finalRank = Number.isFinite(bid) ? rankMaps[team.id]?.[bid] : null;
+                const originalRank = team.itemPriorities?.[round.id] || "-";
+                const finalRankHtml = finalRank ? `<span class="cellRank">#${finalRank}</span>` : "";
+                const priceText = Number.isFinite(bid) ? `${originalRank} | ${finalRankHtml}${bid}` : "未出價";
 
                 return `
                   <td class="${won ? "winCell" : ""}">
-                    <div class="cellPrice">${priceText}                     
-                      <!--${statusText ? `<div class="small cellStatus">${statusText}</div>` : ""}-->
-                    </div>
+                    <div class="cellPrice">${priceText}</div>
                   </td>
                 `;
               }).join("")}
@@ -176,33 +220,17 @@
         elTeamList.appendChild(table);
       }
 
-      function renderLog(state) {
-        const elLog = document.getElementById("log");
-        elLog.innerHTML = "";
-
-        if (!state.log || state.log.length === 0) {
-          const empty = document.createElement("div");
-          empty.className = "logItem";
-          empty.textContent = "尚無成交紀錄。";
-          elLog.appendChild(empty);
-          return;
-        }
-
-        state.log.slice().reverse().forEach(entry => {
-          const div = document.createElement("div");
-          div.className = "logItem";
-          div.innerHTML = entry;
-          elLog.appendChild(div);
-        });
-      }
-
       function init() {
-        const state = loadState();
-        renderTeams(state);
-        renderLog(state);
+        const fullState = loadGameState();
+        if (!fullState) return;
+
+        renderScoreDisplay(fullState);
+        renderTeams(fullState);
       }
 
       init();
+      // Auto-refresh every 2 seconds to pick up changes from index.html
+      setInterval(init, 2000);
     })();
   </script>
   <!--<footer class="footer">

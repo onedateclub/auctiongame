@@ -1,238 +1,396 @@
-(() => {
-  function freshState(){
-    return {
-      teams: Array.from({length: TEAM_COUNT}, (_, i) => ({
+class Team {
+  constructor({ id, name, diamonds, color, wins = [], itemPriorities = {} }) {
+    this.id = id;
+    this.name = name;
+    this.diamonds = diamonds;
+    this.color = color;
+    this.wins = Array.isArray(wins) ? wins : [];
+    this.itemPriorities = typeof itemPriorities === 'object' ? itemPriorities : {};
+  }
+
+  addWin(itemId) {
+    this.wins.push(itemId);
+  }
+
+  setItemPriority(itemId, priority) {
+    if (priority === null || priority === undefined) {
+      delete this.itemPriorities[itemId];
+    } else {
+      this.itemPriorities[itemId] = priority;
+    }
+  }
+
+  getItemPriority(itemId) {
+    return this.itemPriorities[itemId] || null;
+  }
+
+  calculateScore() {
+    let score = 0;
+    this.wins.forEach(itemId => {
+      const priority = this.getItemPriority(itemId);
+      if (priority === 1) score += 4;
+      else if (priority === 2) score += 3;
+      else if (priority === 3) score += 2;
+      else score += 1;
+    });
+    return score;
+  }
+}
+
+class Round {
+  constructor({ id, bids, started = false, done = false, topCandidates = null, winnerTeamId = null, winningBid = null, winnerName = null }) {
+    this.id = id;
+    this.started = started;
+    this.done = done;
+    this.bids = Array.isArray(bids) ? bids : Array(TEAM_COUNT).fill(null);
+    this.topCandidates = topCandidates;
+    this.winnerTeamId = winnerTeamId;
+    this.winningBid = winningBid;
+    this.winnerName = winnerName;
+  }
+
+  getBid(teamId) {
+    return this.bids[teamId];
+  }
+
+  setBid(teamId, value) {
+    this.bids[teamId] = value;
+  }
+}
+
+class AuctionState {
+  constructor({ currentRound = null, teams = [], rounds = [], log = [], priorityConfirmed = false } = {}) {
+    this.currentRound = currentRound;
+    this.teams = teams.map(team => new Team(team));
+    this.rounds = rounds.map(round => new Round(round));
+    this.log = Array.isArray(log) ? log : [];
+    this.priorityConfirmed = priorityConfirmed === true;
+  }
+
+  static fresh() {
+    return new AuctionState({
+      teams: Array.from({ length: TEAM_COUNT }, (_, i) => ({
         id: i,
         name: TEAM_NAMES[i] || `Team ${String.fromCharCode(65 + i)}`,
         diamonds: START_DIAMONDS,
         color: teamColors[i % teamColors.length],
-        wins: [] // item ids won
+        wins: [],
+        itemPriorities: {}
       })),
       currentRound: null,
-      rounds: Array.from({length: ROUND_COUNT}, (_, i) => ({
+      rounds: Array.from({ length: ROUND_COUNT }, (_, i) => ({
         id: i + 1,
         started: false,
         done: false,
         bids: Array(TEAM_COUNT).fill(null),
-        topCandidates: null, // candidates (top 2 prices incl ties)
+        topCandidates: null,
         winnerTeamId: null,
         winningBid: null,
         winnerName: null
       })),
-      log: []
+      log: [],
+      priorityConfirmed: false
+    });
+  }
+
+  static load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return AuctionState.fresh();
+      const parsed = JSON.parse(raw);
+      if (!parsed?.teams || !parsed?.rounds) return AuctionState.fresh();
+
+      const teams = (parsed.teams || []).slice(0, TEAM_COUNT).map((team, i) => ({
+        id: i,
+        name: TEAM_NAMES[i] || team.name || `Team ${String.fromCharCode(65 + i)}`,
+        diamonds: Number.isFinite(team.diamonds) ? team.diamonds : START_DIAMONDS,
+        color: team.color || teamColors[i % teamColors.length],
+        wins: Array.isArray(team.wins) ? team.wins : [],
+        itemPriorities: typeof team.itemPriorities === 'object' ? team.itemPriorities : {}
+      }));
+
+      const rounds = (parsed.rounds || []).slice(0, ROUND_COUNT).map((round, i) => ({
+        id: i + 1,
+        started: round.started === true,
+        done: round.done === true,
+        bids: Array.isArray(round.bids) ? round.bids.slice(0, TEAM_COUNT) : Array(TEAM_COUNT).fill(null),
+        topCandidates: round.topCandidates || null,
+        winnerTeamId: Number.isFinite(round.winnerTeamId) ? round.winnerTeamId : null,
+        winningBid: Number.isFinite(round.winningBid) ? round.winningBid : null,
+        winnerName: round.winnerName != null ? round.winnerName : null
+      }));
+
+      return new AuctionState({
+        currentRound: parsed.currentRound,
+        teams,
+        rounds,
+        log: Array.isArray(parsed.log) ? parsed.log : [],
+        priorityConfirmed: parsed.priorityConfirmed === true
+      });
+    } catch {
+      return AuctionState.fresh();
+    }
+  }
+
+  save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.toJSON()));
+  }
+
+  toJSON() {
+    return {
+      currentRound: this.currentRound,
+      teams: this.teams.map(team => ({
+        id: team.id,
+        name: team.name,
+        diamonds: team.diamonds,
+        color: team.color,
+        wins: team.wins,
+        itemPriorities: team.itemPriorities
+      })),
+      rounds: this.rounds.map(round => ({
+        id: round.id,
+        started: round.started,
+        done: round.done,
+        bids: round.bids,
+        topCandidates: round.topCandidates,
+        winnerTeamId: round.winnerTeamId,
+        winningBid: round.winningBid,
+        winnerName: round.winnerName
+      })),
+      log: this.log,
+      priorityConfirmed: this.priorityConfirmed
     };
   }
 
-  function loadState(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return freshState();
-      const parsed = JSON.parse(raw);
-      if(!parsed?.teams || !parsed?.rounds) return freshState();
-
-	  // Force constant team names even if old saved data had custom names
-	  parsed.teams = (parsed.teams || []).slice(0, TEAM_COUNT);
-	  for (let i = 0; i < TEAM_COUNT; i++) {
-		if (!parsed.teams[i]) {
-			parsed.teams[i] = { id: i, diamonds: START_DIAMONDS, color: teamColors[i % teamColors.length], wins: [] };
-			}
-		parsed.teams[i].name = TEAM_NAMES[i] || `Team ${String.fromCharCode(65 + i)}`;
-	}
-
-      return parsed;
-    }catch{
-      return freshState();
-    }
+  reset() {
+    const fresh = AuctionState.fresh();
+    this.currentRound = fresh.currentRound;
+    this.teams = fresh.teams;
+    this.rounds = fresh.rounds;
+    this.log = fresh.log;
+    this.priorityConfirmed = fresh.priorityConfirmed;
   }
 
-  const state = loadState();
-  const saveState = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  completedCount() {
+    return this.rounds.filter(round => round.done).length;
+  }
 
-  // Elements
-  const elRoundButtons = document.getElementById("roundButtons");
-  const elTeamList = document.getElementById("teamList");
-  const elStatusPill = document.getElementById("statusPill");
-  const elProgressPill = document.getElementById("progressPill");
-  const elRoundTitle = document.getElementById("roundTitle");
-  const elRoundStatePill = document.getElementById("roundStatePill");
-  const elItemName = document.getElementById("itemName");
-  const elItemDesc = document.getElementById("itemDesc");
-  const elMapWrap = document.getElementById("mapWrap");
-  const elItemMap = document.getElementById("itemMap");
-  const elBidInputs = document.getElementById("bidInputs");
-  const elBidHint = document.getElementById("bidHint");
-  const elBidHintPill = document.getElementById("bidHintPill");
-  const elErrorBox = document.getElementById("errorBox");
-  const elBattleBtn = document.getElementById("battleBtn");
-  const elClearBidsBtn = document.getElementById("clearBidsBtn");
-  const elBidBox = document.getElementById("bidBox");
-  const elBattleBox = document.getElementById("battleBox");
-  const elTopGrid = document.getElementById("topGrid");
-  const elWinnerPick = document.getElementById("winnerPick");
-  const elConfirmWinnerBtn = document.getElementById("confirmWinnerBtn");
-  const elLog = document.getElementById("log");
-  const elEndNote = document.getElementById("endNote");
-  const elWinningModal = document.getElementById("winningModal");
-  const elWinningTeamName = document.getElementById("winningTeamName");
-  const resetBtn = document.getElementById("resetBtn");
-  const timerBtn = document.getElementById("timerBtn");
-  const timerModal = document.getElementById("timerModal");
-  const timerCloseBtn = document.getElementById("timerCloseBtn");
-  const timerInput = document.getElementById("timerInput");
-  const timerStartBtn = document.getElementById("timerStartBtn");
-  const timerResetBtn = document.getElementById("timerResetBtn");
-  const timerDisplay = document.getElementById("timerDisplay");
-  const timerStatus = document.getElementById("timerStatus");
+  gameOver() {
+    return this.completedCount() === ROUND_COUNT;
+  }
 
-  let timerInterval = null;
-  let timerRemaining = 120;
-  let timerRunning = false;
+  getRound(roundId) {
+    return this.rounds[roundId - 1];
+  }
 
-  const formatTime = (seconds) => {
+  getTeam(teamId) {
+    return this.teams[teamId];
+  }
+}
+
+class AuctionTimer {
+  constructor({ modal, display, status, input, startBtn, resetBtn, closeBtn }) {
+    this.modal = modal;
+    this.display = display;
+    this.status = status;
+    this.input = input;
+    this.startBtn = startBtn;
+    this.resetBtn = resetBtn;
+    this.closeBtn = closeBtn;
+    this.intervalId = null;
+    this.remaining = 120;
+    this.running = false;
+  }
+
+  formatTime(seconds) {
     const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
     const secs = String(seconds % 60).padStart(2, "0");
     return `${mins}:${secs}`;
-  };
+  }
 
-  const parseTime = (value) => {
+  parseTime(value) {
     const parts = value.trim().split(":");
-    if(parts.length !== 2) return NaN;
+    if (parts.length !== 2) return NaN;
     const mins = Number(parts[0]);
     const secs = Number(parts[1]);
-    if(!Number.isFinite(mins) || !Number.isFinite(secs) || secs < 0 || secs > 59 || mins < 0) return NaN;
+    if (!Number.isFinite(mins) || !Number.isFinite(secs) || secs < 0 || secs > 59 || mins < 0) return NaN;
     return mins * 60 + secs;
-  };
+  }
 
-  const updateTimerUI = () => {
-    timerDisplay.textContent = formatTime(timerRemaining);
-    timerStatus.textContent = timerRunning ? "運行中" : (timerRemaining === 0 ? "時間到！" : "準備就緒");
-    timerStartBtn.textContent = timerRunning ? "停止" : "開始";
-    timerModal.querySelector(".timer-card").classList.toggle("timer-finish", timerRemaining === 0 && !timerRunning);
-  };
+  updateUI() {
+    this.display.textContent = this.formatTime(this.remaining);
+    this.status.textContent = this.running ? "運行中" : (this.remaining === 0 ? "時間到！" : "準備就緒");
+    this.startBtn.textContent = this.running ? "停止" : "開始";
+    this.modal.querySelector(".timer-card").classList.toggle("timer-finish", this.remaining === 0 && !this.running);
+  }
 
-  const stopTimer = () => {
-    timerRunning = false;
-    if(timerInterval){
-      clearInterval(timerInterval);
-      timerInterval = null;
+  stop() {
+    this.running = false;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
     }
-    updateTimerUI();
-  };
+    this.updateUI();
+  }
 
-  const finishTimer = () => {
-    stopTimer();
-    timerRemaining = 0;
-    timerStatus.textContent = "討論結束！";
-    timerDisplay.textContent = "00:00";
-    timerModal.querySelector(".timer-card").classList.add("timer-finish");
-  };
+  finish() {
+    this.stop();
+    this.remaining = 0;
+    this.status.textContent = "討論結束！";
+    this.display.textContent = "00:00";
+    this.modal.querySelector(".timer-card").classList.add("timer-finish");
+  }
 
-  const startTimer = () => {
-    const seconds = parseTime(timerInput.value || "");
-    if(!Number.isFinite(seconds) || seconds <= 0){
-      timerStatus.textContent = "請輸入有效時間 mm:ss";
-      timerModal.querySelector(".timer-card").classList.remove("timer-finish");
+  start() {
+    const seconds = this.parseTime(this.input.value || "");
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      this.status.textContent = "請輸入有效時間 mm:ss";
+      this.modal.querySelector(".timer-card").classList.remove("timer-finish");
       return;
     }
-    timerRemaining = seconds;
-    timerRunning = true;
-    updateTimerUI();
-    timerInterval = setInterval(() => {
-      timerRemaining -= 1;
-      if(timerRemaining <= 0){
-        finishTimer();
+    this.remaining = seconds;
+    this.running = true;
+    this.updateUI();
+    this.intervalId = setInterval(() => {
+      this.remaining -= 1;
+      if (this.remaining <= 0) {
+        this.finish();
       } else {
-        updateTimerUI();
+        this.updateUI();
       }
     }, 1000);
-  };
+  }
 
-  const resetTimer = () => {
-    stopTimer();
-    const seconds = parseTime(timerInput.value || "");
-    timerRemaining = Number.isFinite(seconds) && seconds >= 0 ? seconds : 120;
-    timerInput.value = formatTime(timerRemaining);
-    timerModal.querySelector(".timer-card").classList.remove("timer-finish");
-    updateTimerUI();
-  };
+  reset() {
+    this.stop();
+    const seconds = this.parseTime(this.input.value || "");
+    this.remaining = Number.isFinite(seconds) && seconds >= 0 ? seconds : 120;
+    this.input.value = this.formatTime(this.remaining);
+    this.modal.querySelector(".timer-card").classList.remove("timer-finish");
+    this.updateUI();
+  }
 
-  const openTimer = () => {
-    timerModal.style.display = "flex";
-    timerModal.setAttribute("aria-hidden", "false");
-    timerInput.value = formatTime(timerRemaining > 0 ? timerRemaining : 30);
-    updateTimerUI();
-    timerInput.focus();
-  };
+  open() {
+    this.modal.style.display = "flex";
+    this.modal.setAttribute("aria-hidden", "false");
+    this.input.value = this.formatTime(this.remaining > 0 ? this.remaining : 30);
+    this.updateUI();
+    this.input.focus();
+  }
 
-  const closeTimer = () => {
-    timerModal.style.display = "none";
-    timerModal.setAttribute("aria-hidden", "true");
-    stopTimer();
-  };
+  close() {
+    this.modal.style.display = "none";
+    this.modal.setAttribute("aria-hidden", "true");
+    this.stop();
+  }
 
-  timerBtn.addEventListener("click", openTimer);
-  timerCloseBtn.addEventListener("click", closeTimer);
-  timerResetBtn.addEventListener("click", resetTimer);
-  timerStartBtn.addEventListener("click", () => {
-    timerRunning ? stopTimer() : startTimer();
-  });
-  timerInput.addEventListener("input", () => {
-    if(!timerRunning){
-      const seconds = parseTime(timerInput.value || "");
-      if(Number.isFinite(seconds) && seconds >= 0){
-        timerRemaining = seconds;
+  bind() {
+    this.startBtn.addEventListener("click", () => {
+      this.running ? this.stop() : this.start();
+    });
+    this.resetBtn.addEventListener("click", () => this.reset());
+    this.closeBtn.addEventListener("click", () => this.close());
+    this.input.addEventListener("input", () => {
+      if (!this.running) {
+        const seconds = this.parseTime(this.input.value || "");
+        if (Number.isFinite(seconds) && seconds >= 0) {
+          this.remaining = seconds;
+        }
+        this.updateUI();
       }
-      updateTimerUI();
-    }
-  });
-  timerModal.addEventListener("click", (event) => {
-    if(event.target === timerModal){
-      closeTimer();
-    }
-  });
-  
-  function showError(msg){
-    elErrorBox.style.display = "block";
-    elErrorBox.textContent = msg;
+    });
+    this.modal.addEventListener("click", event => {
+      if (event.target === this.modal) {
+        this.close();
+      }
+    });
   }
-  function clearError(){
-    elErrorBox.style.display = "none";
-    elErrorBox.textContent = "";
+}
+
+class AuctionApp {
+  constructor() {
+    this.state = AuctionState.load();
+    this.elRoundButtons = document.getElementById("roundButtons");
+    this.elTeamList = document.getElementById("teamList");
+    this.elStatusPill = document.getElementById("statusPill");
+    this.elProgressPill = document.getElementById("progressPill");
+    this.elRoundTitle = document.getElementById("roundTitle");
+    this.elRoundStatePill = document.getElementById("roundStatePill");
+    this.elItemName = document.getElementById("itemName");
+    this.elItemDesc = document.getElementById("itemDesc");
+    this.elMapWrap = document.getElementById("mapWrap");
+    this.elItemMap = document.getElementById("itemMap");
+    this.elBidInputs = document.getElementById("bidInputs");
+    this.elBidHint = document.getElementById("bidHint");
+    this.elBidHintPill = document.getElementById("bidHintPill");
+    this.elErrorBox = document.getElementById("errorBox");
+    this.elBattleBtn = document.getElementById("battleBtn");
+    this.elClearBidsBtn = document.getElementById("clearBidsBtn");
+    this.elBidBox = document.getElementById("bidBox");
+    this.elBattleBox = document.getElementById("battleBox");
+    this.elTopGrid = document.getElementById("topGrid");
+    this.elWinnerPick = document.getElementById("winnerPick");
+    this.elConfirmWinnerBtn = document.getElementById("confirmWinnerBtn");
+    this.elLog = document.getElementById("log");
+    this.elEndNote = document.getElementById("endNote");
+    this.elWinningModal = document.getElementById("winningModal");
+    this.elWinningTeamName = document.getElementById("winningTeamName");
+    this.resetBtn = document.getElementById("resetBtn");
+    this.timerBtn = document.getElementById("timerBtn");
+    this.timer = new AuctionTimer({
+      modal: document.getElementById("timerModal"),
+      display: document.getElementById("timerDisplay"),
+      status: document.getElementById("timerStatus"),
+      input: document.getElementById("timerInput"),
+      startBtn: document.getElementById("timerStartBtn"),
+      resetBtn: document.getElementById("timerResetBtn"),
+      closeBtn: document.getElementById("timerCloseBtn")
+    });
   }
 
-  const clampInt = (v) => Number.isFinite(v) ? Math.floor(v) : NaN;
-
-  const completedCount = () => state.rounds.filter(r => r.done).length;
-  const gameOver = () => completedCount() === ROUND_COUNT;
-
-  function updatePills(){
-    const done = completedCount();
-    elProgressPill.textContent = `${done} / ${ROUND_COUNT} 成交`;
-
-    if(done === 0) elStatusPill.textContent = "未成交";
-    else if(done < ROUND_COUNT) elStatusPill.textContent = `成交 (${done}/${ROUND_COUNT})`;
-    else elStatusPill.textContent = "Game finished";
-
-    if(state.currentRound == null){
-      elRoundTitle.textContent = "拍賣品: —";
-      elRoundStatePill.textContent = "Idle";
-    }else{
-      const r = state.rounds[state.currentRound - 1];
-      elRoundTitle.textContent = `拍賣品: ${r.id}`;
-      elRoundStatePill.textContent = r.done ? "Locked" : (r.started ? "Started" : "Idle");
-    }
+  init() {
+    this.timer.bind();
+    this.bindActions();
+    this.render();
+    this.elBattleBtn.disabled = true;
+    this.elClearBidsBtn.disabled = true;
   }
 
-  function getItemById(id){
-    return items.find(x => x.id === id);
+  bindActions() {
+    this.elBattleBtn.addEventListener("click", () => this.handleBattle());
+    this.elConfirmWinnerBtn.addEventListener("click", () => this.handleConfirmWinner());
+    this.elClearBidsBtn.addEventListener("click", () => this.handleClearBids());
+    this.resetBtn.addEventListener("click", () => this.handleReset());
+    this.timerBtn.addEventListener("click", () => this.timer.open());
   }
 
-  function renderTeams(){
-    elTeamList.innerHTML = "";
-    state.teams.forEach(t => {
-      const winsHtml = (t.wins || []).map(itemId => {
-        const it = getItemById(itemId);
-        return it ? `<span class="winBadge" title="Won: ${it.desc}">${it.icon}</span>` : "";
+  showError(message) {
+    this.elErrorBox.style.display = "block";
+    this.elErrorBox.textContent = message;
+  }
+
+  clearError() {
+    this.elErrorBox.style.display = "none";
+    this.elErrorBox.textContent = "";
+  }
+
+  render() {
+    this.renderTeams();
+    this.renderRoundButtons();
+    this.updatePills();
+    this.renderLog();
+  }
+
+  getItemById(id) {
+    return items.find(item => item.id === id);
+  }
+
+  renderTeams() {
+    this.elTeamList.innerHTML = "";
+    this.state.teams.forEach(team => {
+      const winsHtml = (team.wins || []).map(itemId => {
+        const item = this.getItemById(itemId);
+        return item ? `<span class="winBadge" title="Won: ${item.desc}">${item.icon}</span>` : "";
       }).join("");
 
       const row = document.createElement("div");
@@ -240,15 +398,15 @@
       row.innerHTML = `
         <div class="teamTopRow">
           <div class="teamLeft">
-            <span class="dot" style="background:${t.color};"></span>
+            <span class="dot" style="background:${team.color};"></span>
             <div>
-              <div style="font-weight:1000;">${t.name}</div>
+              <div style="font-weight:1000;">${team.name}</div>
             </div>
           </div>
           <div class="diamond" title="Diamonds">
             <div class="small">餘額</div>
             <span class="diaIcon" aria-hidden="true"></span>
-            <span>${t.diamonds}</span>
+            <span>${team.diamonds}</span>
           </div>
         </div>
 
@@ -259,480 +417,449 @@
           </div>
         </div>
       `;
-      elTeamList.appendChild(row);
+      this.elTeamList.appendChild(row);
     });
   }
 
-  function renderRoundButtons(){
-    elRoundButtons.innerHTML = "";
-    state.rounds.forEach(r => {
-      const btn = document.createElement("button");
-      btn.className = "roundBtn";
-      btn.type = "button";
+  renderRoundButtons() {
+    this.elRoundButtons.innerHTML = "";
+    this.state.rounds.forEach(round => {
+      const button = document.createElement("button");
+      button.className = "roundBtn";
+      button.type = "button";
 
-      // Only next round is startable
-      const lockedByProgress = r.id > (completedCount() + 1);
-      const disabled = r.done || lockedByProgress;
+      const lockedByProgress = round.id > (this.state.completedCount() + 1);
+      const disabled = round.done || lockedByProgress;
+      const isSkipped = round.done && round.winnerTeamId == null && round.winnerName === "N/A";
 
-      const isSkipped = r.done && r.winnerTeamId == null && r.winnerName === "N/A";
-      btn.setAttribute("aria-disabled", disabled ? "true" : "false");
-      btn.classList.toggle("done", r.done && !isSkipped);
-      btn.classList.toggle("skipped", isSkipped);
-      btn.classList.toggle("active", state.currentRound === r.id);
-      
-      // Get icon from constant
-	    const miniitem = items[r.id-1];
-	    const icon = miniitem?.icon ?? ""; 
+      button.setAttribute("aria-disabled", disabled ? "true" : "false");
+      button.classList.toggle("done", round.done && !isSkipped);
+      button.classList.toggle("skipped", isSkipped);
+      button.classList.toggle("active", this.state.currentRound === round.id);
 
+      const item = items[round.id - 1];
+      const icon = item?.icon ?? "";
       const roundStatus = isSkipped
         ? "流標"
-        : (r.done ? "成交" : (lockedByProgress ? "未拍賣" : (r.started ? "本輪拍賣" : "即將拍賣")));
-      btn.innerHTML = `
-	    <div class="icon">${icon}</div>
+        : (round.done ? "成交" : (lockedByProgress ? "未拍賣" : (round.started ? "本輪拍賣" : "即將拍賣")));
+
+      button.innerHTML = `
+        <div class="icon">${icon}</div>
         <div class="s">${roundStatus}</div>
       `;
 
-      btn.addEventListener("click", () => {
-        if(disabled) return;
-        startRound(r.id);
+      button.addEventListener("click", () => {
+        if (disabled) return;
+        this.startRound(round.id);
       });
 
-      elRoundButtons.appendChild(btn);
+      this.elRoundButtons.appendChild(button);
     });
   }
 
-  function renderItem(roundId){
+  renderItem(roundId) {
     const item = items[roundId - 1];
-    elItemName.textContent = `${item.icon} ${item.desc}`;
-    elItemDesc.textContent = '';
-	  elItemMap.src = item.mapUrl;
-	  elMapWrap.style.display = "block";
-
+    this.elItemName.textContent = `${item.icon} ${item.desc}`;
+    this.elItemDesc.textContent = "";
+    this.elItemMap.src = item.mapUrl;
+    this.elMapWrap.style.display = "block";
   }
 
-  function renderBidInputs(roundId){
-    elBidInputs.innerHTML = "";
-    const round = state.rounds[roundId - 1];
+  renderBidInputs(roundId) {
+    this.elBidInputs.innerHTML = "";
+    const round = this.state.getRound(roundId);
 
-    state.teams.forEach((t) => {
+    this.state.teams.forEach(team => {
       const row = document.createElement("div");
       row.className = "bidRow";
-
-      const inputId = `bid-${roundId}-${t.id}`;
-      const existing = round.bids[t.id];
+      const inputId = `bid-${roundId}-${team.id}`;
+      const existing = round.getBid(team.id);
 
       row.innerHTML = `
         <div class="teamName">
-          <span class="dot" style="background:${t.color};"></span>
+          <span class="dot" style="background:${team.color};"></span>
           <div>
-            <div>${t.name}</div>
-            <div class="small">Max bid: ${t.diamonds}</div>
+            <div>${team.name}</div>
+            <div class="small">Max bid: ${team.diamonds}</div>
           </div>
         </div>
         <div>
           <input id="${inputId}" type="number" min="0" step="1" placeholder="0" ${round.done ? "disabled" : ""} />
         </div>
       `;
-      elBidInputs.appendChild(row);
+      this.elBidInputs.appendChild(row);
 
       const input = row.querySelector("input");
-      if(existing != null) input.value = existing;
+      if (existing != null) input.value = existing;
 
       input.addEventListener("input", () => {
-        if(state.currentRound !== roundId) return;
-        clearError();
+        if (this.state.currentRound !== roundId) return;
+        this.clearError();
         const raw = input.value;
-        if(raw === ""){
-          round.bids[t.id] = null;
-          saveState();
+        if (raw === "") {
+          round.setBid(team.id, null);
+          this.state.save();
           return;
         }
-        const v = clampInt(Number(raw));
-        round.bids[t.id] = Number.isFinite(v) ? v : null;
-        saveState();
+        const value = this.clampInt(Number(raw));
+        round.setBid(team.id, Number.isFinite(value) ? value : null);
+        this.state.save();
       });
     });
 
-    elBidHint.textContent = round.done ? "Round locked (completed)" : "";
-    elBattleBtn.textContent = `確認出價`;
-    elBattleBtn.disabled = round.done;
-    elClearBidsBtn.disabled = round.done;
-    elBidHintPill.textContent = round.done ? "Locked" : "Enter bids";
+    this.elBidHint.textContent = round.done ? "Round locked (completed)" : "";
+    this.elBattleBtn.textContent = `確認出價`;
+    this.elBattleBtn.disabled = round.done;
+    this.elClearBidsBtn.disabled = round.done;
+    this.elBidHintPill.textContent = round.done ? "Locked" : "Enter bids";
   }
 
-  function resetBattleUI(){
-    elBidBox.style.display = "block";
-    elBattleBox.style.display = "none";
-    elTopGrid.innerHTML = "";
-    elWinnerPick.innerHTML = "";
-    elConfirmWinnerBtn.disabled = true;
+  clampInt(value) {
+    return Number.isFinite(value) ? Math.floor(value) : NaN;
   }
 
-  function startRound(roundId){
-    const round = state.rounds[roundId - 1];
-    state.currentRound = roundId;
+  resetBattleUI() {
+    this.elBidBox.style.display = "block";
+    this.elBattleBox.style.display = "none";
+    this.elTopGrid.innerHTML = "";
+    this.elWinnerPick.innerHTML = "";
+    this.elConfirmWinnerBtn.disabled = true;
+  }
+
+  startRound(roundId) {
+    const round = this.state.getRound(roundId);
+    this.state.currentRound = roundId;
     round.started = true;
 
-    clearError();
-    resetBattleUI();
-    renderItem(roundId);
-    renderBidInputs(roundId);
-    renderRoundButtons();
-    updatePills();
-    saveState();
+    this.clearError();
+    this.resetBattleUI();
+    this.renderItem(roundId);
+    this.renderBidInputs(roundId);
+    this.renderRoundButtons();
+    this.updatePills();
+    this.state.save();
 
-    elBattleBtn.disabled = round.done;
-    elClearBidsBtn.disabled = round.done;
+    this.elBattleBtn.disabled = round.done;
+    this.elClearBidsBtn.disabled = round.done;
   }
 
-  function validateAllBids(roundId){
-    const round = state.rounds[roundId - 1];
+  validateAllBids(roundId) {
+    const round = this.state.getRound(roundId);
 
-    for(let teamId = 0; teamId < TEAM_COUNT; teamId++){
-      const bid = round.bids[teamId];
+    for (let teamId = 0; teamId < TEAM_COUNT; teamId++) {
+      const bid = round.getBid(teamId);
+      const team = this.state.getTeam(teamId);
 
-      if(bid == null || bid === ""){
-        return { ok:false, msg:`Please input all 5 team prices before battling.` };
+      if (bid == null || bid === "") {
+        return { ok: false, msg: `Please input all 5 team prices before battling.` };
       }
-      if(!Number.isFinite(bid) || bid < 0){
-        return { ok:false, msg:`All bids must be whole numbers (0 or higher).` };
+      if (!Number.isFinite(bid) || bid < 0) {
+        return { ok: false, msg: `All bids must be whole numbers (0 or higher).` };
       }
-      if(bid > state.teams[teamId].diamonds){
-        return { ok:false, msg:`${state.teams[teamId].name}'s bid (${bid}) exceeds remaining diamonds (${state.teams[teamId].diamonds}).` };
+      if (bid > team.diamonds) {
+        return { ok: false, msg: `${team.name}'s bid (${bid}) exceeds remaining diamonds (${team.diamonds}).` };
       }
-      if(bid !== 0 && bid < 20){
-        return { ok:false, msg:`${state.teams[teamId].name}'s bid (${bid}) is below the minimum allowed bid (20).` };
+      if (bid !== 0 && bid < 20) {
+        return { ok: false, msg: `${team.name}'s bid (${bid}) is below the minimum allowed bid (20).` };
       }
     }
-    return { ok:true };
+
+    return { ok: true };
   }
 
-  /**
-   * Tie-aware "Top 2 price":
-   * - Find distinct bid values in descending order
-   * - Take best value (top1) and second distinct value (top2) if exists
-   * - Include all teams whose bid == top1 OR bid == top2
-   * - If no second distinct value, include all teams in top1 (could be everyone)
-   */
-  function computeTop2WithTies(roundId) {
-    const round = state.rounds[roundId - 1];
-
-    const bids = state.teams.map(t => ({
-      teamId: t.id,
-      name: t.name,
-      color: t.color,
-      bid: round.bids[t.id]
+  computeTop2WithTies(roundId) {
+    const round = this.state.getRound(roundId);
+    const bids = this.state.teams.map(team => ({
+      teamId: team.id,
+      name: team.name,
+      color: team.color,
+      bid: round.getBid(team.id)
     }));
 
-    // Get distinct bid values sorted descending
-    const distinct = Array.from(new Set(bids.map(b => b.bid))).sort((a, b) => b - a);
+    const distinct = Array.from(new Set(bids.map(entry => entry.bid))).sort((a, b) => b - a);
     const top1 = distinct[0];
+    const top1Count = bids.filter(entry => entry.bid === top1).length;
 
-    // Count how many teams have top1
-    const top1Count = bids.filter(b => b.bid === top1).length;
-
-    // If top1 has 2 or more candidates → DO NOT return top2
     let top2 = null;
     if (top1Count === 1 && distinct.length > 1) {
       top2 = distinct[1];
     }
 
-    // Filter candidates
     const candidates = bids
-      .filter(b =>
-        b.bid === top1 ||
-        (top2 != null && b.bid === top2 && b.bid > 0)
-      )
+      .filter(entry => entry.bid === top1 || (top2 != null && entry.bid === top2 && entry.bid > 0))
       .sort((a, b) => b.bid - a.bid || a.name.localeCompare(b.name));
 
     return { candidates, top1, top2 };
   }
 
+  renderCandidatesAndWinnerPick(roundId, info) {
+    const round = this.state.getRound(roundId);
+    const { candidates } = info;
+    this.elTopGrid.innerHTML = "";
 
-  function renderCandidatesAndWinnerPick(roundId, info){
-    const { candidates, top1, top2 } = info;
-    const round = state.rounds[roundId - 1];
-    elTopGrid.innerHTML = "";
-
-    const allTeamsWithBids = state.teams.map(t => ({
-      ...t,
-      bid: round.bids[t.id]
+    const allTeamsWithBids = this.state.teams.map(team => ({
+      ...team,
+      bid: round.getBid(team.id)
     })).sort((a, b) => b.bid - a.bid);
 
-    allTeamsWithBids.forEach((t, index) => {
-      const rank = index + 1;
+    allTeamsWithBids.forEach(team => {
       const card = document.createElement("div");
       card.className = "topCard";
       card.innerHTML = `
         <div class="who" style="display:flex; gap:10px; align-items:center;">
-          <span class="dot" style="background:${t.color};"></span>
-          <span>${t.name}</span>
+          <span class="dot" style="background:${team.color};"></span>
+          <span>${team.name}</span>
         </div>
-        <div class="price">Bid: ${t.bid}</div>
+        <div class="price">Bid: ${team.bid}</div>
       `;
-      elTopGrid.appendChild(card);
+      this.elTopGrid.appendChild(card);
     });
 
-    elWinnerPick.innerHTML = `<div class="muted" style="font-weight:1000;">評判選出中標隊伍:</div>`;
-    candidates.forEach(c => {
+    this.elWinnerPick.innerHTML = `<div class="muted" style="font-weight:1000;">評判選出中標隊伍:</div>`;
+    candidates.forEach(candidate => {
       const label = document.createElement("label");
       label.className = "radioPill";
       label.innerHTML = `
-        <input type="radio" name="winner" value="${c.teamId}" />
+        <input type="radio" name="winner" value="${candidate.teamId}" />
         <span style="display:flex; gap:8px; align-items:center;">
-          ${c.name}
+          ${candidate.name}
         </span>
       `;
       label.querySelector("input").addEventListener("change", () => {
-        elConfirmWinnerBtn.disabled = false;
+        this.elConfirmWinnerBtn.disabled = false;
       });
-      elWinnerPick.appendChild(label);
+      this.elWinnerPick.appendChild(label);
     });
   }
 
-  function renderLog(){
-    elLog.innerHTML = "";
-    (state.log || []).slice().reverse().forEach(entry => {
+  renderLog() {
+    this.elLog.innerHTML = "";
+    (this.state.log || []).slice().reverse().forEach(entry => {
       const div = document.createElement("div");
       div.className = "logItem";
       div.innerHTML = entry;
-      elLog.appendChild(div);
+      this.elLog.appendChild(div);
     });
   }
 
-  function lockRound(roundId){
-    const round = state.rounds[roundId - 1];
+  lockRound(roundId) {
+    const round = this.state.getRound(roundId);
     round.done = true;
 
-    resetBattleUI();
-    renderBidInputs(roundId);
-    renderRoundButtons();
-    renderTeams();
-    updatePills();
-    saveState();
+    this.resetBattleUI();
+    this.renderBidInputs(roundId);
+    this.renderRoundButtons();
+    this.renderTeams();
+    this.updatePills();
+    this.state.save();
 
-    if(gameOver()){
-      showFinalLeaderboard();
+    if (this.state.gameOver()) {
+      this.showFinalLeaderboard();
     }
   }
 
-  function addLog(roundId, winnerTeamId, winningBid, candidates){
+  addLog(roundId, winnerTeamId, winningBid) {
     const item = items[roundId - 1];
-    const winner = state.teams[winnerTeamId];
-    const round = state.rounds[roundId - 1];
+    const winner = this.state.getTeam(winnerTeamId);
+    const round = this.state.getRound(roundId);
 
-    const candText = candidates.map(c => `${c.name} : (${c.bid}) 鑽石`).join(" • ");
-    const allBidsText = state.teams.map(t => `${t.name} 出價 (${round.bids[t.id]}) 鑽石`).join(" • ");
-
+    const allBidsText = this.state.teams.map(team => `${team.name} 出價 (${round.getBid(team.id)}) 鑽石`).join(" • ");
     const html = `
       <div style="font-weight:1000;">Item ${roundId}: ${item.icon} ${item.desc}</div>
       <div class="muted">出價: ${allBidsText}</div>
-      <!--<div class="muted">出線隊伍: ${candText}</div>-->
       <div style="margin-top:6px;">
         中標者: <b>${winner.name}</b> 支付 <b>${winningBid}</b> 鑽石
-        <!--剩餘: <b>${winner.diamonds}</b>-->
       </div>
     `;
-    state.log = state.log || [];
-    state.log.push(html);
-    saveState();
-    renderLog();
+
+    this.state.log.push(html);
+    this.state.save();
+    this.renderLog();
   }
 
-  function addNoWinnerLog(roundId){
+  addNoWinnerLog(roundId) {
     const item = items[roundId - 1];
     const html = `
       <div style="font-weight:1000;">Item ${roundId}: ${item.icon} ${item.desc}</div>
       <div class="muted">本輪流標</div>
     `;
-    state.log = state.log || [];
-    state.log.push(html);
-    saveState();
-    renderLog();
+    this.state.log.push(html);
+    this.state.save();
+    this.renderLog();
   }
 
-  function showFinalLeaderboard(){
-
-    elEndNote.style.display = "block";
-    elEndNote.innerHTML = `
+  showFinalLeaderboard() {
+    this.elEndNote.style.display = "block";
+    this.elEndNote.innerHTML = `
       <div style="font-weight:1000; margin-bottom:6px;">🏁 Finish</div>
     `;
   }
 
-  function showWinningEffect(teamName){
-    elWinningTeamName.textContent = teamName;
-    elWinningModal.style.display = "flex";
-    elWinningModal.setAttribute("aria-hidden", "false");
-    
+  showWinningEffect(teamName) {
+    this.elWinningTeamName.textContent = teamName;
+    this.elWinningModal.style.display = "flex";
+    this.elWinningModal.setAttribute("aria-hidden", "false");
     setTimeout(() => {
-      elWinningModal.style.display = "none";
-      elWinningModal.setAttribute("aria-hidden", "true");
+      this.elWinningModal.style.display = "none";
+      this.elWinningModal.setAttribute("aria-hidden", "true");
     }, 2000);
   }
 
-  function promptNextRound(){
-    const nextId = completedCount() + 1;
-    if(nextId <= ROUND_COUNT){
-      state.currentRound = null;
-      saveState();
-      renderRoundButtons();
-      updatePills();
+  promptNextRound() {
+    const nextId = this.state.completedCount() + 1;
+    if (nextId <= ROUND_COUNT) {
+      this.state.currentRound = null;
+      this.state.save();
+      this.renderRoundButtons();
+      this.updatePills();
 
-      elItemName.textContent = "討論時間";
-      elItemDesc.textContent = "Click Item " + nextId + " to continue.";
-      elMapWrap.style.display = "none";
-      elBidInputs.innerHTML = "";
-      elBidHint.textContent = "Start the next round to enable bid inputs.";
-      elBattleBtn.disabled = true;
-      elClearBidsBtn.disabled = true;
-      resetBattleUI();
+      this.elItemName.textContent = "討論時間";
+      this.elItemDesc.textContent = "Click Item " + nextId + " to continue.";
+      this.elMapWrap.style.display = "none";
+      this.elBidInputs.innerHTML = "";
+      this.elBidHint.textContent = "Start the next round to enable bid inputs.";
+      this.elBattleBtn.disabled = true;
+      this.elClearBidsBtn.disabled = true;
+      this.resetBattleUI();
     }
   }
 
-  // Actions
-  elBattleBtn.addEventListener("click", () => {
-    clearError();
-
-    if(state.currentRound == null){
-      showError("Start a round first.");
+  handleBattle() {
+    this.clearError();
+    if (this.state.currentRound == null) {
+      this.showError("Start a round first.");
       return;
     }
-    const roundId = state.currentRound;
-    const round = state.rounds[roundId - 1];
-    if(round.done) return;
 
-    const v = validateAllBids(roundId);
-    if(!v.ok){
-      showError(v.msg);
+    const roundId = this.state.currentRound;
+    const round = this.state.getRound(roundId);
+    if (round.done) return;
+
+    const result = this.validateAllBids(roundId);
+    if (!result.ok) {
+      this.showError(result.msg);
       return;
     }
 
     const allZero = round.bids.every(bid => bid === 0);
-    if(allZero){
+    if (allZero) {
       round.winnerTeamId = null;
       round.winnerName = "N/A";
       round.winningBid = 0;
       round.topCandidates = null;
 
-      lockRound(roundId);
-      addNoWinnerLog(roundId);
-      promptNextRound();
+      this.lockRound(roundId);
+      this.addNoWinnerLog(roundId);
+      this.promptNextRound();
       return;
     }
 
-    const info = computeTop2WithTies(roundId);
+    const info = this.computeTop2WithTies(roundId);
     round.topCandidates = info;
-    saveState();
+    this.state.save();
 
-    elBattleBox.style.display = "block";
-    elBidBox.style.display = "none";
-    elConfirmWinnerBtn.disabled = true;
-    renderCandidatesAndWinnerPick(roundId, info);
-  });
+    this.elBattleBox.style.display = "block";
+    this.elBidBox.style.display = "none";
+    this.elConfirmWinnerBtn.disabled = true;
+    this.renderCandidatesAndWinnerPick(roundId, info);
+  }
 
-  elConfirmWinnerBtn.addEventListener("click", () => {
-    clearError();
-    const roundId = state.currentRound;
-    if(roundId == null) return;
+  handleConfirmWinner() {
+    this.clearError();
+    const roundId = this.state.currentRound;
+    if (roundId == null) return;
 
-    const round = state.rounds[roundId - 1];
-    if(round.done) return;
+    const round = this.state.getRound(roundId);
+    if (round.done) return;
 
     const selected = document.querySelector('input[name="winner"]:checked');
-    if(!selected){
-      showError("Please select a winner from the displayed candidates.");
+    if (!selected) {
+      this.showError("Please select a winner from the displayed candidates.");
       return;
     }
 
     const winnerTeamId = Number(selected.value);
-    const winningBid = round.bids[winnerTeamId];
+    const winningBid = round.getBid(winnerTeamId);
 
-    if(!Number.isFinite(winningBid)){
-      showError("Winning bid is invalid. Please re-enter bids.");
+    if (!Number.isFinite(winningBid)) {
+      this.showError("Winning bid is invalid. Please re-enter bids.");
       return;
     }
 
-    const winnerTeam = state.teams[winnerTeamId];
-    if(winningBid > winnerTeam.diamonds){
-      showError(`${winnerTeam.name} does not have enough diamonds. Please adjust bids.`);
+    const winnerTeam = this.state.getTeam(winnerTeamId);
+    if (winningBid > winnerTeam.diamonds) {
+      this.showError(`${winnerTeam.name} does not have enough diamonds. Please adjust bids.`);
       return;
     }
 
-    // Deduct diamonds
     winnerTeam.diamonds -= winningBid;
-
-    // Record win icon
     const item = items[roundId - 1];
-    winnerTeam.wins = winnerTeam.wins || [];
-    winnerTeam.wins.push(item.id);
+    winnerTeam.addWin(item.id);
 
-    // Save round result
     round.winnerTeamId = winnerTeamId;
     round.winningBid = winningBid;
 
-    const candidates = round.topCandidates?.candidates || [];
-    addLog(roundId, winnerTeamId, winningBid, candidates);
-    
-    // Show winning effect
-    showWinningEffect(winnerTeam.name);
-    
-    lockRound(roundId);
-    promptNextRound();
-  });
+    this.addLog(roundId, winnerTeamId, winningBid);
+    this.showWinningEffect(winnerTeam.name);
+    this.lockRound(roundId);
+    this.promptNextRound();
+  }
 
-  elClearBidsBtn.addEventListener("click", () => {
-    clearError();
-    if(state.currentRound == null) return;
+  handleClearBids() {
+    this.clearError();
+    if (this.state.currentRound == null) return;
 
-    const roundId = state.currentRound;
-    const round = state.rounds[roundId - 1];
-    if(round.done) return;
+    const round = this.state.getRound(this.state.currentRound);
+    if (round.done) return;
 
     round.bids = Array(TEAM_COUNT).fill(null);
     round.topCandidates = null;
-    saveState();
-    renderBidInputs(roundId);
-    resetBattleUI();
-  });
-
-  resetBtn.addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEY);
-    const s = freshState();
-    Object.keys(state).forEach(k => delete state[k]);
-    Object.assign(state, s);
-
-    clearError();
-    resetBattleUI();
-
-    elItemName.textContent = "討論時間";
-    elItemDesc.textContent = "點擊編號以顯示拍賣物";
-    elMapWrap.style.display = "none";
-    elBidInputs.innerHTML = "";
-    elBidHint.textContent = "Start a round to enable bid inputs.";
-    elBattleBtn.disabled = true;
-    elClearBidsBtn.disabled = true;
-
-    elEndNote.style.display = "none";
-    elEndNote.innerHTML = "";
-    closeTimer();
-
-    renderTeams();
-    renderRoundButtons();
-    updatePills();
-    renderLog();
-    saveState();
-  });
-
-  // Init
-  function init(){
-    renderTeams();
-    renderRoundButtons();
-    updatePills();
-    renderLog();
-
-    // Keep simple: user clicks Start Round to reopen.
-    elBattleBtn.disabled = true;
-    elClearBidsBtn.disabled = true;
+    this.state.save();
+    this.renderBidInputs(this.state.currentRound);
+    this.resetBattleUI();
   }
-  init();
-})();
+
+  handleReset() {
+    localStorage.removeItem(STORAGE_KEY);
+    this.state.reset();
+    this.clearError();
+    this.resetBattleUI();
+
+    this.elItemName.textContent = "討論時間";
+    this.elItemDesc.textContent = "點擊編號以顯示拍賣物";
+    this.elMapWrap.style.display = "none";
+    this.elBidInputs.innerHTML = "";
+    this.elBidHint.textContent = "Start a round to enable bid inputs.";
+    this.elBattleBtn.disabled = true;
+    this.elClearBidsBtn.disabled = true;
+    this.elEndNote.style.display = "none";
+    this.elEndNote.innerHTML = "";
+    this.timer.close();
+
+    this.render();
+    this.state.save();
+  }
+
+  updatePills() {
+    const done = this.state.completedCount();
+    this.elProgressPill.textContent = `${done} / ${ROUND_COUNT} 成交`;
+    if (done === 0) {
+      this.elStatusPill.textContent = "未成交";
+    } else if (done < ROUND_COUNT) {
+      this.elStatusPill.textContent = `成交 (${done}/${ROUND_COUNT})`;
+    } else {
+      this.elStatusPill.textContent = "Game finished";
+    }
+
+    if (this.state.currentRound == null) {
+      this.elRoundTitle.textContent = "拍賣品: —";
+      this.elRoundStatePill.textContent = "Idle";
+    } else {
+      const round = this.state.getRound(this.state.currentRound);
+      this.elRoundTitle.textContent = `拍賣品: ${round.id}`;
+      this.elRoundStatePill.textContent = round.done ? "Locked" : (round.started ? "Started" : "Idle");
+    }
+  }
+}
+
+new AuctionApp().init();
